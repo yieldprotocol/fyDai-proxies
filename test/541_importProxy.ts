@@ -279,7 +279,7 @@ contract('ImportProxy', async (accounts) => {
         user: user,
         delegate: importProxy.address,
       },
-      await controller.signatureCount(user),
+      (await controller.signatureCount(user)).toString(),
       MAX
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)

@@ -69,7 +69,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
             user: user1,
             delegate: borrowProxy.address,
           },
-          await controller.signatureCount(user1),
+          (await controller.signatureCount(user1)).toString(),
           MAX
         )
         controllerSig = sign(controllerDigest, userPrivateKey)
@@ -164,7 +164,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
                 user: user1,
                 delegate: borrowProxy.address,
               },
-              await controller.signatureCount(user1),
+              (await controller.signatureCount(user1)).toString(),
               MAX
             )
             controllerSig = sign(controllerDigest, userPrivateKey)
@@ -186,7 +186,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
                 user: user1,
                 delegate: borrowProxy.address,
               },
-              await controller.signatureCount(user1),
+              (await controller.signatureCount(user1)).toString(),
               MAX
             )
             controllerSig = sign(controllerDigest, userPrivateKey)
@@ -200,7 +200,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
                 user: user1,
                 delegate: borrowProxy.address,
               },
-              await pool.signatureCount(user1),
+              (await pool.signatureCount(user1)).toString(),
               MAX
             )
             const poolSig = sign(poolDigest, userPrivateKey)
@@ -275,7 +275,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
           user: user1,
           delegate: borrowProxy.address,
         },
-        await pool.signatureCount(user1),
+        (await pool.signatureCount(user1)).toString(),
         MAX
       )
       poolSig = sign(poolDigest, userPrivateKey)

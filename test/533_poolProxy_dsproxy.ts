@@ -148,7 +148,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
           user: user2,
           delegate: dsProxy.address,
         },
-        await controller.signatureCount(user2),
+        (await controller.signatureCount(user2)).toString(),
         MAX
       )
       controllerSig = sign(controllerDigest, user2PrivateKey)
@@ -194,7 +194,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
             user: user2,
             delegate: dsProxy.address,
           },
-          await pool0.signatureCount(user2),
+          (await pool0.signatureCount(user2)).toString(),
           MAX
         )
         poolSig = sign(poolDigest, user2PrivateKey)
