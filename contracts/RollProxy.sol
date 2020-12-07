@@ -57,18 +57,19 @@ contract RollProxy is DecimalMath {
 
         // remove liquidity
         (uint256 daiObtained, uint256 fyDaiObtained) = pool1.burn(msg.sender, address(this), poolTokens);
-        uint256 daiProportion1 = daiObtained.div(daiObtained.add(fyDaiObtained));
-        uint256 daiProportion2 = daiReserves.div(daiReserves.add(fyDaiReserves));
+        uint256 daiProportion1 = daiObtained.mul(UNIT).div(daiObtained.add(fyDaiObtained));
+        uint256 daiProportion2 = daiReserves.mul(UNIT).div(daiReserves.add(fyDaiReserves));
 
         if (daiProportion1 <= daiProportion2) {
+            uint256 fyDaiToAdd = daiObtained.mul(UNIT).div(daiReserves.mul(UNIT).div(fyDaiReserves));
             minted = pool2.mint(address(this), msg.sender, daiObtained);
-            controller.repayFYDai(CHAI, fyDai.maturity(), address(this), msg.sender, fyDai.balanceOf(address(this)));
+            controller.repayFYDai(CHAI, fyDai.maturity(), address(this), msg.sender, fyDaiObtained.sub(fyDaiToAdd));
         } else {
-            uint256 daiToAdd = fyDaiObtained.div(fyDaiReserves.div(fyDaiReserves.add(daiReserves)));
+            uint256 daiToAdd = fyDaiObtained.mul(UNIT).div(fyDaiReserves.mul(UNIT).div(daiReserves));
             minted = pool2.mint(address(this), msg.sender, daiToAdd);
-            controller.repayDai(CHAI, fyDai.maturity(), address(this), msg.sender, dai.balanceOf(address(this)));
+            controller.repayDai(CHAI, fyDai.maturity(), address(this), msg.sender, daiObtained.sub(daiToAdd));
         }
-            
+
         withdrawAssets();
     }
 
@@ -96,6 +97,7 @@ contract RollProxy is DecimalMath {
         bool approvals = true;
         approvals = approvals && dai.allowance(address(this), treasury) == type(uint256).max;
         approvals = approvals && chai.allowance(address(this), address(chai)) == type(uint256).max;
+        approvals = approvals && pool2.fyDai().allowance(address(this), address(pool2)) >= type(uint112).max;
         approvals = approvals && dai.allowance(address(this), address(pool2)) == type(uint256).max;
         bool controllerSig = controller.delegated(msg.sender, address(this));
         bool poolSig1 = pool1.delegated(msg.sender, address(this));
@@ -111,8 +113,9 @@ contract RollProxy is DecimalMath {
         // Allow Chai to take chai for unwrapping
         if (chai.allowance(address(this), address(chai)) < type(uint256).max) chai.approve(address(chai), type(uint256).max);
 
-        // Allow pool 2 to take dai for minting
+        // Allow pool 2 to take dai and fyDai for minting
         if (dai.allowance(address(this), address(pool2)) < type(uint256).max) dai.approve(address(pool2), type(uint256).max);
+        if (pool2.fyDai().allowance(address(this), address(pool2)) < type(uint112).max) pool2.fyDai().approve(address(pool2), type(uint256).max);
     }
 
     /// @dev Mints liquidity with provided Dai by borrowing fyDai with some of the Dai.
