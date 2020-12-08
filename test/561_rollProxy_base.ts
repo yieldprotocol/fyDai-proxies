@@ -132,75 +132,41 @@ contract('RollProxy', async (accounts) => {
     await helper.revertToSnapshot(snapshotId)
   })
 
-  it('migrates liquidity between pools with dai proportion on destination above proportion on source', async () => {
-    const poolTokens = await pool1.balanceOf(user1)
-    const debt = await controller.debtFYDai(CHAI, maturity0, user1)
-    const daiBalance = await dai.balanceOf(user1)
+  it('migrates liquidity with dai proportion on destination above proportion on source', async () => {
+    const pool1TokensBefore = await pool1.balanceOf(user1)
+    const pool2TokensBefore = await pool2.balanceOf(user1) 
 
     const fyDaiToSell = initialDai.div(new BN('10')).toString()
     await fyDai0.mint(owner, fyDaiToSell, { from: owner })
     await pool1.sellFYDai(owner, owner, fyDaiToSell, { from: owner })
 
-    // Has pool1 tokens
-    // expect(poolTokens).to.be.bignumber.gt(ZERO)
-    // Has fyDai debt
-    // expect(debt).to.be.bignumber.gt(ZERO)
-    // Doesn't have dai
-    // expect(daiBalance).to.be.bignumber.eq(ZERO)
-    // Has fyDai
-    // expect(await fyDai0.balanceOf(user2)).to.be.bignumber.eq(toBorrow)
+    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
 
-    await proxy.migrateLiquidity(pool1.address, pool2.address, poolTokens, { from: user1 })
-
-    // Doesn't have pool1 tokens
-    // expect(await pool1.balanceOf(user2)).to.be.bignumber.eq(ZERO)
-    // Has less fyDai debt
-    // expect(await controller.debtFYDai(CHAI, maturity0, user2)).to.be.bignumber.lt(debt)
-    // Got some dai
-    // expect(await dai.balanceOf(user2)).to.be.bignumber.gt(ZERO)
-    // Has the same fyDai
-    // expect(await fyDai0.balanceOf(user2)).to.be.bignumber.eq(toBorrow)
-    // Proxy doesn't keep dai (beyond rounding)
-    // expect(await dai.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    // Proxy doesn't keep fyDai (beyond rounding)
-    // expect(await fyDai0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    // Proxy doesn't keep liquidity (beyond rounding)
-    // expect(await pool1.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
+    expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
+    expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
   })
 
-  it('migrates liquidity between pools with dai proportion on source above proportion on destination', async () => {
-    const poolTokens = await pool1.balanceOf(user1)
-    const debt = await controller.debtFYDai(CHAI, maturity0, user1)
-    const daiBalance = await dai.balanceOf(user1)
+  it('migrates liquidity with dai proportion on source above proportion on destination', async () => {
+    const pool1TokensBefore = await pool1.balanceOf(user1)
+    const pool2TokensBefore = await pool2.balanceOf(user1) 
 
     const fyDaiToSell = initialDai.div(new BN('10')).toString()
     await fyDai0.mint(owner, fyDaiToSell, { from: owner })
     await pool2.sellFYDai(owner, owner, fyDaiToSell, { from: owner })
 
-    // Has pool1 tokens
-    // expect(poolTokens).to.be.bignumber.gt(ZERO)
-    // Has fyDai debt
-    // expect(debt).to.be.bignumber.gt(ZERO)
-    // Doesn't have dai
-    // expect(daiBalance).to.be.bignumber.eq(ZERO)
-    // Has fyDai
-    // expect(await fyDai0.balanceOf(user2)).to.be.bignumber.eq(toBorrow)
+    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
 
-    await proxy.migrateLiquidity(pool1.address, pool2.address, poolTokens, { from: user1 })
+    expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
+    expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
+  })
 
-    // Doesn't have pool1 tokens
-    // expect(await pool1.balanceOf(user2)).to.be.bignumber.eq(ZERO)
-    // Has less fyDai debt
-    // expect(await controller.debtFYDai(CHAI, maturity0, user2)).to.be.bignumber.lt(debt)
-    // Got some dai
-    // expect(await dai.balanceOf(user2)).to.be.bignumber.gt(ZERO)
-    // Has the same fyDai
-    // expect(await fyDai0.balanceOf(user2)).to.be.bignumber.eq(toBorrow)
-    // Proxy doesn't keep dai (beyond rounding)
-    // expect(await dai.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    // Proxy doesn't keep fyDai (beyond rounding)
-    // expect(await fyDai0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    // Proxy doesn't keep liquidity (beyond rounding)
-    // expect(await pool1.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
+  it('migrates liquidity with an equal dai proportion', async () => {
+    const pool1TokensBefore = await pool1.balanceOf(user1)
+    const pool2TokensBefore = await pool2.balanceOf(user1) 
+
+    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
+
+    expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
+    expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
   })
 })
