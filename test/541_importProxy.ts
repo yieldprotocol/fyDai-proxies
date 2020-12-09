@@ -55,7 +55,7 @@ contract('ImportProxy', async (accounts) => {
     // Setup DSProxyRegistry
     proxyRegistry = await DSProxyRegistry.new(proxyFactory.address, { from: owner })
 
-    // Setup Splitter
+    // Setup ImportProxy
     importProxy = await ImportProxy.new(controller.address, [pool1.address], proxyRegistry.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
@@ -90,14 +90,14 @@ contract('ImportProxy', async (accounts) => {
     await expectRevert(importProxy.hope(owner, { from: user }), 'Restricted to user or its dsproxy')
     await expectRevert(importProxy.nope(owner, { from: user }), 'Restricted to user or its dsproxy')
 
-    const splitterMock = await ImportProxyMock.new(importProxy.address, { from: owner })
-    let calldata = splitterMock.contract.methods.hope(user).encodeABI()
-    await dsProxy.methods['execute(address,bytes)'](splitterMock.address, calldata, {
+    const importProxyMock = await ImportProxyMock.new(importProxy.address, { from: owner })
+    let calldata = importProxyMock.contract.methods.hope(user).encodeABI()
+    await dsProxy.methods['execute(address,bytes)'](importProxyMock.address, calldata, {
       from: user,
     })
     assert.equal(await vat.can(importProxy.address, dsProxy.address), 1)
-    calldata = splitterMock.contract.methods.nope(user).encodeABI()
-    await dsProxy.methods['execute(address,bytes)'](splitterMock.address, calldata, {
+    calldata = importProxyMock.contract.methods.nope(user).encodeABI()
+    await dsProxy.methods['execute(address,bytes)'](importProxyMock.address, calldata, {
       from: user,
     })
     assert.equal(await vat.can(importProxy.address, dsProxy.address), 0)
@@ -161,12 +161,12 @@ contract('ImportProxy', async (accounts) => {
     assert.equal(result[0], false)
     assert.equal(result[1], false)
 
-    await vat.hope(importProxy.address, { from: user }) // Allowing Splitter to manipulate debt for user in MakerDAO
+    await vat.hope(importProxy.address, { from: user }) // Allowing ImportProxy to manipulate debt for user in MakerDAO
     result = await importProxy.importPositionCheck({ from: user })
     assert.equal(result[0], true)
     assert.equal(result[1], false)
 
-    await controller.addDelegate(importProxy.address, { from: user }) // Allowing Splitter to create debt for use in Yield
+    await controller.addDelegate(importProxy.address, { from: user }) // Allowing ImportProxy to create debt for use in Yield
     result = await importProxy.importPositionCheck({ from: user })
     assert.equal(result[0], true)
     assert.equal(result[1], true)
@@ -193,8 +193,8 @@ contract('ImportProxy', async (accounts) => {
     // console.log(daiYield)
 
     // Add permissions for vault migration
-    await controller.addDelegate(importProxy.address, { from: user }) // Allowing Splitter to create debt for use in Yield
-    await vat.hope(importProxy.address, { from: user }) // Allowing Splitter to manipulate debt for user in MakerDAO
+    await controller.addDelegate(importProxy.address, { from: user }) // Allowing ImportProxy to create debt for use in Yield
+    await vat.hope(importProxy.address, { from: user }) // Allowing ImportProxy to manipulate debt for user in MakerDAO
 
     // Fork the vault off to importProxy
     await importProxy.hope(user, { from: user })
@@ -241,8 +241,8 @@ contract('ImportProxy', async (accounts) => {
     // console.log(daiYield)
 
     // Add permissions for vault migration
-    await controller.addDelegate(importProxy.address, { from: user }) // Allowing Splitter to create debt for use in Yield
-    await vat.hope(dsProxy.address, { from: user }) // Allowing Splitter to manipulate debt for user in MakerDAO
+    await controller.addDelegate(importProxy.address, { from: user }) // Allowing ImportProxy to create debt for use in Yield
+    await vat.hope(dsProxy.address, { from: user }) // Allowing ImportProxy to manipulate debt for user in MakerDAO
 
     // Go!!!
     const calldata = importProxy.contract.methods
@@ -285,7 +285,7 @@ contract('ImportProxy', async (accounts) => {
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
     // Add permissions for vault migration
-    await vat.hope(dsProxy.address, { from: user }) // Allowing Splitter to manipulate debt for user in MakerDAO
+    await vat.hope(dsProxy.address, { from: user }) // Allowing ImportProxy to manipulate debt for user in MakerDAO
 
     // Go!!!
     const calldata = importProxy.contract.methods

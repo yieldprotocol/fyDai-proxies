@@ -116,14 +116,14 @@ contract ImportProxy is DecimalMath, IFlashMinter {
     /// ImportProxy as itself: Maker to Yield proxy
     /// --------------------------------------------------
 
-    // Splitter accepts to take the user vault. Callable only by the user or its dsproxy
-    // Anyone can call this to donate a collateralized vault to Splitter.
+    // ImportProxy accepts to take the user vault. Callable only by the user or its dsproxy
+    // Anyone can call this to donate a collateralized vault to ImportProxy.
     function hope(address user) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         vat.hope(msg.sender);
     }
 
-    // Splitter doesn't accept to take the user vault. Callable only by the user or its dsproxy
+    // ImportProxy doesn't accept to take the user vault. Callable only by the user or its dsproxy
     function nope(address user) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         vat.nope(msg.sender);
@@ -252,7 +252,7 @@ contract ImportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount dai debt to move from MakerDAO to Yield. Denominated in Dai (= art * rate)
-    /// @param controllerSig packed signature for delegation of Splitter (not dsproxy) in the controller. Ignored if '0x'.
+    /// @param controllerSig packed signature for delegation of ImportProxy (not dsproxy) in the controller. Ignored if '0x'.
     function importPositionWithSignature(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, bytes memory controllerSig) public {
         if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importProxy), controllerSig);
         return importPosition(pool, user, wethAmount, debtAmount);

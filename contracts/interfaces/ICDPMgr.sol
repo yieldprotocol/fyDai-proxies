@@ -7,7 +7,8 @@ interface ICDPMgr {
     function owns(uint cdp) view external returns(address);
     function urns(uint cdp) view external returns(address);
     function cdpCan(address owns, uint cdp, address usr) view external returns(uint256);
+    function cdpAllow(uint cdp, address usr, uint ok) external;
     function give(uint cdp, address usr) external;
     function frob(uint cdp, int dink, int dart) external;
-
+    function flux(uint cdp, address dst, uint wad) external;
 }
