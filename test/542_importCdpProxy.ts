@@ -64,7 +64,13 @@ contract('ImportCdpProxy', async (accounts) => {
     proxyRegistry = await DSProxyRegistry.new(proxyFactory.address, { from: owner })
 
     // Setup ImportCdpProxy
-    importCdpProxy = await ImportCdpProxy.new(controller.address, [pool1.address], proxyRegistry.address, cdpMgr.address, { from: owner })
+    importCdpProxy = await ImportCdpProxy.new(
+      controller.address,
+      [pool1.address],
+      proxyRegistry.address,
+      cdpMgr.address,
+      { from: owner }
+    )
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -118,7 +124,9 @@ contract('ImportCdpProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
 
     await expectRevert(
-      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, bnify(daiDebt).mul(10), { from: user }),
+      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, bnify(daiDebt).mul(10), {
+        from: user,
+      }),
       'ImportCdpProxy: Not enough debt in Maker'
     )
   })
@@ -131,7 +139,9 @@ contract('ImportCdpProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
 
     await expectRevert(
-      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, bnify(wethCollateral).mul(10), daiDebt, { from: user }),
+      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, bnify(wethCollateral).mul(10), daiDebt, {
+        from: user,
+      }),
       'ImportCdpProxy: Not enough collateral in Maker'
     )
   })
@@ -164,7 +174,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
-    
+
     // Give CDP to static ImportCdpProxy
     await cdpMgr.give(cdp, importCdpProxy.address, { from: user })
 
@@ -228,9 +238,9 @@ contract('ImportCdpProxy', async (accounts) => {
     await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
 
     // Move just half of the CDP
-    const wethToMove = (new BN(wethCollateral)).div(new BN('2')).toString()
-    const debtToMove = (new BN(daiDebt)).div(new BN('2')).toString()
-    const fyDaiDebt = (await importCdpProxy.fyDaiForDai(pool1.address, (new BN(daiMaker)).div(new BN('2')))).toString()
+    const wethToMove = new BN(wethCollateral).div(new BN('2')).toString()
+    const debtToMove = new BN(daiDebt).div(new BN('2')).toString()
+    const fyDaiDebt = (await importCdpProxy.fyDaiForDai(pool1.address, new BN(daiMaker).div(new BN('2')))).toString()
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
