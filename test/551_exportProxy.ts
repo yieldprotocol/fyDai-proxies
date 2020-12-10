@@ -1,6 +1,5 @@
 const Pool = artifacts.require('Pool')
 const ExportProxy = artifacts.require('ExportProxy')
-const UnitConverter = artifacts.require('UnitConverter')
 const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
@@ -26,7 +25,6 @@ contract('ExportProxy', async (accounts) => {
   let weth: Contract
   let fyDai1: Contract
   let exportProxy: Contract
-  let unitConverter: Contract
   let pool1: Contract
 
   let proxyFactory: Contract
@@ -50,9 +48,6 @@ contract('ExportProxy', async (accounts) => {
 
     // Setup ExportProxy
     exportProxy = await ExportProxy.new(controller.address, [pool1.address], { from: owner })
-
-    // Setup UnitConverter
-    unitConverter = await UnitConverter.new(vat.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
