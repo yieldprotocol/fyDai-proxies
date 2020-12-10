@@ -73,17 +73,17 @@ contract ExportCdpProxy is DecimalMath, IFlashMinter {
         IFYDai fyDai = pool.fyDai();
 
         require(
-            cdpMgr.cdpCan(cdpMgr.owns(cdp), cdp, msg.sender) == 1,
-            "ExportProxy: User doesn't have rights to the target cdp"
+            cdpMgr.owns(cdp) == msg.sender || cdpMgr.cdpCan(cdpMgr.owns(cdp), cdp, msg.sender) == 1,
+            "ExportCdpProxy: User doesn't have rights to the target cdp"
         );
         // The user specifies the fyDai he wants to move, and the weth to be passed on as collateral
         require(
             fyDaiAmount <= controller.debtFYDai(WETH, fyDai.maturity(), msg.sender),
-            "ExportProxy: Not enough debt in Yield"
+            "ExportCdpProxy: Not enough debt in Yield"
         );
         require(
             wethAmount <= controller.posted(WETH, msg.sender),
-            "ExportProxy: Not enough collateral in Yield"
+            "ExportCdpProxy: Not enough collateral in Yield"
         );
         // Flash mint the fyDai
         fyDai.flashMint(
@@ -98,7 +98,7 @@ contract ExportCdpProxy is DecimalMath, IFlashMinter {
     function executeOnFlashMint(uint256 fyDaiAmount, bytes calldata data) external override {
         (IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 maxFYDaiPrice) = 
             abi.decode(data, (IPool, address, uint256, uint256, uint256));
-        require(msg.sender == address(IPool(pool).fyDai()), "ExportProxy: Restricted callback");
+        require(msg.sender == address(IPool(pool).fyDai()), "ExportCdpProxy: Restricted callback");
 
         _exportCdpPosition(pool, user, cdp, wethAmount, fyDaiAmount, maxFYDaiPrice);
     }
@@ -118,16 +118,16 @@ contract ExportCdpProxy is DecimalMath, IFlashMinter {
         uint256 daiAmount = pool.buyFYDaiPreview(fyDaiAmount.toUint128());
         require(
             daiAmount <= muld(fyDaiAmount, maxFYDaiPrice),
-            "ExportProxy: Maximum fyDai price exceeded"
+            "ExportCdpProxy: Maximum fyDai price exceeded"
         );
         
         IFYDai fyDai = IFYDai(pool.fyDai());
 
-        // Pay the Yield debt - ExportProxy pays FYDai to remove the debt of `user`
+        // Pay the Yield debt - ExportCdpProxy pays FYDai to remove the debt of `user`
         // Controller should take exactly all fyDai flash minted.
         controller.repayFYDai(WETH, fyDai.maturity(), address(this), user, fyDaiAmount);
 
-        // Withdraw the collateral from Yield, ExportProxy will hold it
+        // Withdraw the collateral from Yield, ExportCdpProxy will hold it
         controller.withdraw(WETH, user, address(this), wethAmount);
 
         // Post the collateral to Maker, in the vault referenced by the cdp
@@ -141,8 +141,8 @@ contract ExportCdpProxy is DecimalMath, IFlashMinter {
             wethAmount.toInt256(),                   // Adding Weth collateral
             divdrup(daiAmount, rate).toInt256()      // Adding Dai debt
         );
-        cdpMgr.move(cdp, address(this), daiAmount.mul(UNIT)); // Transfer the Dai to ExportProxy within MakerDAO, in RAD
-        daiJoin.exit(address(this), daiAmount);             // ExportProxy will hold the dai temporarily
+        cdpMgr.move(cdp, address(this), daiAmount.mul(UNIT)); // Transfer the Dai to ExportCdpProxy within MakerDAO, in RAD
+        daiJoin.exit(address(this), daiAmount);             // ExportCdpProxy will hold the dai temporarily
 
         // Sell the Dai for FYDai at Pool - It should make up for what was taken with repayYdai
         pool.buyFYDai(address(this), address(this), fyDaiAmount.toUint128());
