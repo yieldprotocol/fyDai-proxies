@@ -1,5 +1,6 @@
 const Pool = artifacts.require('Pool')
 const ExportProxy = artifacts.require('ExportProxy')
+const UnitConverter = artifacts.require('UnitConverter')
 const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
@@ -25,6 +26,7 @@ contract('ExportProxy', async (accounts) => {
   let weth: Contract
   let fyDai1: Contract
   let exportProxy: Contract
+  let unitConverter: Contract
   let pool1: Contract
 
   let proxyFactory: Contract
@@ -48,6 +50,9 @@ contract('ExportProxy', async (accounts) => {
 
     // Setup ExportProxy
     exportProxy = await ExportProxy.new(controller.address, [pool1.address], { from: owner })
+
+    // Setup UnitConverter
+    unitConverter = await UnitConverter.new(vat.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -117,7 +122,7 @@ contract('ExportProxy', async (accounts) => {
     assert.equal(await fyDai1.balanceOf(exportProxy.address), 0)
 
     // Will need this one for testing. As time passes, even for one block, the resulting dai debt will be higher than this value
-    const makerDebtEstimate = new BN(await exportProxy.daiForFYDai(pool1.address, toBorrow))
+    const makerDebtEstimate = new BN(await unitConverter.daiForFYDai(pool1.address, toBorrow))
 
     await exportProxy.exportPosition(pool1.address, wethTokens1, toBorrow, { from: user })
 

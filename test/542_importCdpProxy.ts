@@ -1,6 +1,6 @@
 const Pool = artifacts.require('Pool')
 const ImportCdpProxy = artifacts.require('ImportCdpProxy')
-// const ImportCdpProxyMock = artifacts.require('ImportCdpProxyMock')
+const UnitConverter = artifacts.require('UnitConverter')
 const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
@@ -24,11 +24,11 @@ contract('ImportCdpProxy', async (accounts) => {
   let dai: Contract
   let vat: Contract
   let cdpMgr: Contract
-  let treasury: Contract
   let controller: Contract
   let weth: Contract
   let fyDai1: Contract
   let importCdpProxy: Contract
+  let unitConverter: Contract
   let pool1: Contract
 
   let proxyFactory: Contract
@@ -43,7 +43,6 @@ contract('ImportCdpProxy', async (accounts) => {
     maturity1 = (await web3.eth.getBlock(block)).timestamp + 30000000 // Far enough so that the extra weth to borrow is above dust
 
     env = await YieldEnvironmentLite.setup([maturity1])
-    treasury = env.treasury
     controller = env.controller
     vat = env.maker.vat
     dai = env.maker.dai
@@ -71,6 +70,9 @@ contract('ImportCdpProxy', async (accounts) => {
       cdpMgr.address,
       { from: owner }
     )
+
+    // Setup UnitConverter
+    unitConverter = await UnitConverter.new(vat.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -170,7 +172,7 @@ contract('ImportCdpProxy', async (accounts) => {
     expect(wethCollateral).to.be.bignumber.gt(ZERO)
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await importCdpProxy.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
@@ -199,7 +201,7 @@ contract('ImportCdpProxy', async (accounts) => {
     expect(wethCollateral).to.be.bignumber.gt(ZERO)
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await importCdpProxy.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
@@ -240,7 +242,7 @@ contract('ImportCdpProxy', async (accounts) => {
     // Move just half of the CDP
     const wethToMove = new BN(wethCollateral).div(new BN('2')).toString()
     const debtToMove = new BN(daiDebt).div(new BN('2')).toString()
-    const fyDaiDebt = (await importCdpProxy.fyDaiForDai(pool1.address, new BN(daiMaker).div(new BN('2')))).toString()
+    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, new BN(daiMaker).div(new BN('2')))).toString()
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
