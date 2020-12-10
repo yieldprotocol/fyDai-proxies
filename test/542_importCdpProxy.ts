@@ -1,6 +1,5 @@
 const Pool = artifacts.require('Pool')
 const ImportCdpProxy = artifacts.require('ImportCdpProxy')
-const UnitConverter = artifacts.require('UnitConverter')
 const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
@@ -10,7 +9,7 @@ import { id } from 'ethers/lib/utils'
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, mulRay, bnify, MAX, name, chainId, ZERO } from './shared/utils'
+import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO } from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -28,7 +27,6 @@ contract('ImportCdpProxy', async (accounts) => {
   let weth: Contract
   let fyDai1: Contract
   let importCdpProxy: Contract
-  let unitConverter: Contract
   let pool1: Contract
 
   let proxyFactory: Contract
@@ -37,6 +35,8 @@ contract('ImportCdpProxy', async (accounts) => {
 
   let cdp: any
   let urn: any
+
+  const rayTwo = toRay(2)
 
   beforeEach(async () => {
     const block = await web3.eth.getBlockNumber()
@@ -70,9 +70,6 @@ contract('ImportCdpProxy', async (accounts) => {
       cdpMgr.address,
       { from: owner }
     )
-
-    // Setup UnitConverter
-    unitConverter = await UnitConverter.new(vat.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -126,7 +123,7 @@ contract('ImportCdpProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
 
     await expectRevert(
-      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, bnify(daiDebt).mul(10), {
+      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, bnify(daiDebt).mul(10), rayTwo, {
         from: user,
       }),
       'ImportCdpProxy: Not enough debt in Maker'
@@ -141,7 +138,22 @@ contract('ImportCdpProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
 
     await expectRevert(
-      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, bnify(wethCollateral).mul(10), daiDebt, {
+      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, bnify(wethCollateral).mul(10), daiDebt, rayTwo, {
+        from: user,
+      }),
+      'ImportCdpProxy: Not enough collateral in Maker'
+    )
+  })
+
+  it('does not allow to migrate if maximum Dai price exceeded', async () => {
+    // Give CDP to static ImportCdpProxy
+    await cdpMgr.give(cdp, importCdpProxy.address, { from: user })
+    const urn = await cdpMgr.urns(cdp)
+    const daiDebt = bnify((await vat.urns(WETH, urn)).art).toString()
+    const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
+
+    await expectRevert(
+      importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, bnify(wethCollateral).mul(10), daiDebt, toRay(1).toString(), {
         from: user,
       }),
       'ImportCdpProxy: Not enough collateral in Maker'
@@ -180,7 +192,7 @@ contract('ImportCdpProxy', async (accounts) => {
     // Give CDP to static ImportCdpProxy
     await cdpMgr.give(cdp, importCdpProxy.address, { from: user })
 
-    await importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, daiDebt, { from: user })
+    await importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, daiDebt, rayTwo, { from: user })
 
     assert.equal(await fyDai1.balanceOf(importCdpProxy.address), 0)
     assert.equal(await dai.balanceOf(importCdpProxy.address), 0)
@@ -209,7 +221,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPosition(pool1.address, cdp.toString(), wethCollateral, daiDebt)
+      .importCdpPosition(pool1.address, cdp.toString(), wethCollateral, daiDebt, rayTwo)
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -246,7 +258,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPosition(pool1.address, cdp.toString(), wethToMove, debtToMove)
+      .importCdpPosition(pool1.address, cdp.toString(), wethToMove, debtToMove, rayTwo)
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -288,7 +300,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPositionWithSignature(pool1.address, cdp.toString(), wethCollateral, daiDebt, controllerSig)
+      .importCdpPositionWithSignature(pool1.address, cdp.toString(), wethCollateral, daiDebt, rayTwo, controllerSig)
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -297,14 +309,14 @@ contract('ImportCdpProxy', async (accounts) => {
 
   it('cdp migration is restricted to cdp owners or their proxies', async () => {
     await expectRevert(
-      importCdpProxy.importCdpPosition(pool1.address, 1, 1, 1, { from: owner }),
+      importCdpProxy.importCdpPosition(pool1.address, 1, 1, 1, rayTwo, { from: owner }),
       'ImportCdpProxy: Restricted to user or its dsproxy'
     )
   })
 
   it('importCdpFromProxy is restricted to cdp owners or their proxies', async () => {
     await expectRevert(
-      importCdpProxy.importCdpFromProxy(pool1.address, user, 1, 1, 1, { from: owner }),
+      importCdpProxy.importCdpFromProxy(pool1.address, user, 1, 1, 1, rayTwo, { from: owner }),
       'ImportCdpProxy: Restricted to user or its dsproxy'
     )
   })

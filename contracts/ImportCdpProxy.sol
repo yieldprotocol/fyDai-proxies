@@ -18,7 +18,7 @@ import "@nomiclabs/buidler/console.sol";
 
 
 interface IImportCdpProxy {
-    function importCdpFromProxy(IPool, address, uint256, uint256, uint256) external;
+    function importCdpFromProxy(IPool, address, uint256, uint256, uint256, uint256) external;
     function give(uint, address) external;
 }
 
@@ -93,12 +93,12 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// @param cdp CDP Vault to import
     /// @param wethAmount Weth collateral to import
     /// @param debtAmount Normalized debt to move ndai * rate = dai
-    function importCdpPosition(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount) public {
+    function importCdpPosition(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
         address user = cdpMgr.owns(cdp);
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "ImportCdpProxy: Restricted to user or its dsproxy"); // Redundant?
 
         cdpMgr.give(cdp, address(importCdpProxy));           // Give the CDP to importCdpProxy
-        importCdpProxy.importCdpFromProxy(pool, user, cdp, wethAmount, debtAmount); // Migrate part of the CDP to a Yield Vault
+        importCdpProxy.importCdpFromProxy(pool, user, cdp, wethAmount, debtAmount, maxDaiPrice); // Migrate part of the CDP to a Yield Vault
         importCdpProxy.give(cdp, user);                      // Return the rest of the CDP to its owner
     }
 
@@ -106,9 +106,9 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
     /// @param cdp CDP Vault to import
-    function importCdp(IPool pool, uint256 cdp) public {
+    function importCdp(IPool pool, uint256 cdp, uint256 maxDaiPrice) public {
         (uint256 ink, uint256 art) = vat.urns(WETH, cdpMgr.urns(cdp));
-        importCdpPosition(pool, cdp, ink, art);
+        importCdpPosition(pool, cdp, ink, art, maxDaiPrice);
     }
 
     /// --------------------------------------------------
@@ -128,7 +128,8 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount Normalized dai debt to move from MakerDAO to Yield. ndai * rate = dai
-    function importCdpFromProxy(IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 debtAmount) public {
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    function importCdpFromProxy(IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "ImportCdpProxy: Restricted to user or its dsproxy");
         // The user specifies the fyDai he wants to mint to cover his maker debt, the weth to be passed on as collateral, and the dai debt to move
         (uint256 ink, uint256 art) = vat.urns(WETH, cdpMgr.urns(cdp)); // Should this require be in `importPosition`?
@@ -143,7 +144,9 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
         // Flash mint the fyDai
         IFYDai fyDai = pool.fyDai();
         (, uint256 rate,,,) = vat.ilks(WETH);
-        uint256 fyDaiAmount = pool.buyDaiPreview(muld(debtAmount, rate).toUint128());
+        uint256 daiNeeded = muld(debtAmount, rate);
+        uint256 fyDaiAmount = pool.buyDaiPreview(daiNeeded.toUint128());
+        require(fyDaiAmount <= muld(daiNeeded, maxDaiPrice), "ImportCdpProxy: Maximum Dai price exceeded");
         fyDai.flashMint(
             fyDaiAmount,
             abi.encode(pool, user, cdp, wethAmount, debtAmount)
@@ -206,22 +209,29 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     }
 
     /// @dev Transfer debt and collateral from MakerDAO to Yield
-    /// Needs vat.hope(importCdpProxy.address, { from: user });
+    /// Needs `cdpMgr.cdpAllow(cdp, proxy.address, 1)`
     /// @param pool The pool to trade in (and therefore fyDai series to borrow)
-    /// @param cdp The CDP contaiinng the migrated debt and collateral, its owner will own the Yield vault.
+    /// @param cdp The CDP containing the migrated debt and collateral, its owner will own the Yield vault.
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount dai debt to move from MakerDAO to Yield. Denominated in Dai (= art * rate)
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     /// @param controllerSig packed signature for delegation of ImportCdpProxy (not dsproxy) in the controller. Ignored if '0x'.
-    function importCdpPositionWithSignature(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, bytes memory controllerSig) public {
+    function importCdpPositionWithSignature(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice, bytes memory controllerSig) public {
         address user = cdpMgr.owns(cdp);
         if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importCdpProxy), controllerSig);
-        return importCdpPosition(pool, cdp, wethAmount, debtAmount);
+        return importCdpPosition(pool, cdp, wethAmount, debtAmount, maxDaiPrice);
     }
 
-    function importCdpWithSignature(IPool pool, uint256 cdp, bytes memory controllerSig) public {
+    /// @dev Transfer a CDP from MakerDAO to Yield
+    /// Needs `cdpMgr.cdpAllow(cdp, proxy.address, 1)`
+    /// @param pool The pool to trade in (and therefore fyDai series to borrow)
+    /// @param cdp The CDP containing the migrated debt and collateral, its owner will own the Yield vault.
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    /// @param controllerSig packed signature for delegation of ImportCdpProxy (not dsproxy) in the controller. Ignored if '0x'.
+    function importCdpWithSignature(IPool pool, uint256 cdp, uint256 maxDaiPrice, bytes memory controllerSig) public {
         address user = cdpMgr.owns(cdp);
         if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importCdpProxy), controllerSig);
-        return importCdp(pool, cdp);
+        return importCdp(pool, cdp, maxDaiPrice);
     }
 }
