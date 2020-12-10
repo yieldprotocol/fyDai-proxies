@@ -231,7 +231,7 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// If `return[0]` is `false`, calling `cdpMgr.cdpAllow(cdp, proxy.address, 1)` will set the MakerDAO approval.
     /// If `return[1]` is `false`, `importCdpFromProxyWithSignature` must be called with a controller signature.
     /// If `return` is `(true, true)`, `importCdpFromProxy` won't fail because of missing approvals or signatures.
-    function importCdpPositionCheck(address user, uint256 cdp) public view returns (bool, bool) {
+    function importCdpPositionCheck(uint256 cdp) public view returns (bool, bool) {
         address user = cdpMgr.owns(cdp);
         bool approvals = cdpMgr.cdpCan(user, cdp, address(this)) == 1;
         bool controllerSig = controller.delegated(msg.sender, address(importCdpProxy));

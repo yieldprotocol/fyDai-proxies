@@ -147,17 +147,17 @@ contract('ImportCdpProxy', async (accounts) => {
   })
 
   it('checks approvals and signatures to move maker vault to yield', async () => {
-    let result = await importCdpProxy.importCdpPositionCheck(user, cdp, { from: user })
+    let result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
     assert.equal(result[0], false)
     assert.equal(result[1], false)
 
     await cdpMgr.cdpAllow(cdp, importCdpProxy.address, 1, { from: user }) // Usually the cdpAllow would be for dsproxy
-    result = await importCdpProxy.importCdpPositionCheck(user, cdp, { from: user })
+    result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
     assert.equal(result[0], true)
     assert.equal(result[1], false)
 
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
-    result = await importCdpProxy.importCdpPositionCheck(user, cdp, { from: user })
+    result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
     assert.equal(result[0], true)
     assert.equal(result[1], true)
   })
