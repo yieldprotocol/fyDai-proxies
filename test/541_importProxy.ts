@@ -1,7 +1,6 @@
 const Pool = artifacts.require('Pool')
 const ImportProxy = artifacts.require('ImportProxy')
 const ImportProxyMock = artifacts.require('ImportProxyMock')
-const UnitConverter = artifacts.require('UnitConverter')
 const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
@@ -27,7 +26,6 @@ contract('ImportProxy', async (accounts) => {
   let weth: Contract
   let fyDai1: Contract
   let importProxy: Contract
-  let unitConverter: Contract
   let pool1: Contract
 
   let proxyFactory: Contract
@@ -57,9 +55,6 @@ contract('ImportProxy', async (accounts) => {
 
     // Setup ImportProxy
     importProxy = await ImportProxy.new(controller.address, [pool1.address], proxyRegistry.address, { from: owner })
-
-    // Setup UnitConverter
-    unitConverter = await UnitConverter.new(vat.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -188,7 +183,7 @@ contract('ImportProxy', async (accounts) => {
     // daiYield: Value of created Yield position, in dai
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(daiMaker)).toString()
     const daiYield = (await controller.inDai(WETH, maturity1, fyDaiDebt)).toString()
     // console.log(daiDebt)
     // console.log(daiMaker)
@@ -236,7 +231,7 @@ contract('ImportProxy', async (accounts) => {
     // daiYield: Value of created Yield position, in dai
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(daiMaker)).toString()
     const daiYield = (await controller.inDai(WETH, maturity1, fyDaiDebt)).toString()
     // console.log(daiDebt)
     // console.log(daiMaker)

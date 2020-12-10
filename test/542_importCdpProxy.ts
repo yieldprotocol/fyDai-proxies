@@ -172,7 +172,7 @@ contract('ImportCdpProxy', async (accounts) => {
     expect(wethCollateral).to.be.bignumber.gt(ZERO)
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(daiMaker)).toString()
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
@@ -201,7 +201,7 @@ contract('ImportCdpProxy', async (accounts) => {
     expect(wethCollateral).to.be.bignumber.gt(ZERO)
 
     const daiMaker = mulRay(daiDebt, rate1).toString()
-    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, daiMaker)).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(daiMaker)).toString()
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
@@ -242,7 +242,7 @@ contract('ImportCdpProxy', async (accounts) => {
     // Move just half of the CDP
     const wethToMove = new BN(wethCollateral).div(new BN('2')).toString()
     const debtToMove = new BN(daiDebt).div(new BN('2')).toString()
-    const fyDaiDebt = (await unitConverter.fyDaiForDai(pool1.address, new BN(daiMaker).div(new BN('2')))).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(new BN(daiMaker).div(new BN('2')))).toString()
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods

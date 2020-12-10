@@ -122,7 +122,7 @@ contract('ExportProxy', async (accounts) => {
     assert.equal(await fyDai1.balanceOf(exportProxy.address), 0)
 
     // Will need this one for testing. As time passes, even for one block, the resulting dai debt will be higher than this value
-    const makerDebtEstimate = new BN(await unitConverter.daiForFYDai(pool1.address, toBorrow))
+    const makerDebtEstimate = await pool1.buyFYDaiPreview(toBorrow)
 
     await exportProxy.exportPosition(pool1.address, wethTokens1, toBorrow, { from: user })
 
