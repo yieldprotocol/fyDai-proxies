@@ -1,20 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.6.10;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IController.sol";
-import "./interfaces/IWeth.sol";
-import "./interfaces/IGemJoin.sol";
-import "./interfaces/IDaiJoin.sol";
-import "./interfaces/IVat.sol";
 import "./interfaces/ICDPMgr.sol";
-import "./interfaces/IPool.sol";
-import "./interfaces/IFYDai.sol";
 import "./interfaces/IFlashMinter.sol";
 import "./helpers/DecimalMath.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
-import "@nomiclabs/buidler/console.sol";
+import "./ImportProxyBase.sol";
 
 
 interface IImportCdpProxy {
@@ -22,64 +14,19 @@ interface IImportCdpProxy {
     function give(uint, address) external;
 }
 
-interface IProxyRegistry {
-    function proxies(address) external view returns (address);
-}
-
-contract ImportCdpProxy is DecimalMath, IFlashMinter {
+contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     using SafeCast for uint256;
     using YieldAuth for IController;
 
-    IVat public immutable vat;
     ICDPMgr public immutable cdpMgr;
-    IWeth public immutable weth;
-    IERC20 public immutable dai;
-    IGemJoin public immutable wethJoin;
-    IDaiJoin public immutable daiJoin;
-    IController public immutable controller;
-    address public immutable treasury;
     IImportCdpProxy public immutable importCdpProxy;
-    IProxyRegistry public immutable proxyRegistry;
 
-    bytes32 public constant WETH = "ETH-A";
-    bool public constant MTY = true;
-
-    constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_, ICDPMgr cdpMgr_) public {
-        ITreasury _treasury = controller_.treasury();
-
-        IVat _vat = _treasury.vat();
-        IWeth _weth = _treasury.weth();
-        IERC20 _dai = _treasury.dai();
-        address _daiJoin = address(_treasury.daiJoin());
-        address _wethJoin = address(_treasury.wethJoin());
-        
-
-        controller = controller_;
-        treasury = address(_treasury);
+    constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_, ICDPMgr cdpMgr_)
+        public
+        ImportProxyBase(controller_, pools_, proxyRegistry_)
+    {
         importCdpProxy = IImportCdpProxy(address(this)); // This contract has two functions, as itself, and delegatecalled by a dsproxy.
-
         cdpMgr = cdpMgr_;
-        proxyRegistry = proxyRegistry_;
-
-        // Allow pool to take fyDai for trading
-        for (uint i = 0 ; i < pools_.length; i++) {
-            pools_[i].fyDai().approve(address(pools_[i]), type(uint256).max);
-        }
-
-        // Allow treasury to take weth for posting
-        _weth.approve(address(_treasury), type(uint256).max);
-
-        // Allow wethJoin to move weth out of vat for this proxy
-        _vat.hope(_wethJoin);
-
-        // Allow daiJoin to take Dai for paying debt
-        _dai.approve(_daiJoin, type(uint256).max);
-
-        vat = _vat;
-        weth = _weth;
-        dai = _dai;
-        daiJoin = IDaiJoin(_daiJoin);
-        wethJoin = IGemJoin(_wethJoin);
     }
 
     /// --------------------------------------------------
