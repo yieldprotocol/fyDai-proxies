@@ -208,8 +208,7 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// If `return[1]` is `false`, `importCdpFromProxyWithSignature` must be called with a controller signature.
     /// If `return` is `(true, true)`, `importCdpFromProxy` won't fail because of missing approvals or signatures.
     function importCdpPositionCheck(uint256 cdp) public view returns (bool, bool) {
-        address user = cdpMgr.owns(cdp);
-        bool approvals = cdpMgr.cdpCan(user, cdp, address(this)) == 1;
+        bool approvals = cdpMgr.cdpCan(cdpMgr.owns(cdp), cdp, address(this)) == 1;
         bool controllerSig = controller.delegated(msg.sender, address(importCdpProxy));
         return (approvals, controllerSig);
     }

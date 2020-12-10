@@ -11,4 +11,5 @@ interface ICDPMgr {
     function give(uint cdp, address usr) external;
     function frob(uint cdp, int dink, int dart) external;
     function flux(uint cdp, address dst, uint wad) external;
+    function move(uint cdp, address dst, uint rad) external;
 }
