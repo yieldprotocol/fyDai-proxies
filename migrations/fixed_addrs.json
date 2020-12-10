@@ -26,7 +26,8 @@
     "fyDaiLP21MarAddress" : "0xb39221E6790Ae8360B7E8C1c7221900fad9397f9",
     "fyDaiLP21SepAddress" : "0x8EcC94a91b5CF03927f5eb8c60ABbDf48F82b0b3", 
     "proxyFactoryAddress" : "0xA26e15C895EFc0616177B7c1e7270A4C7D51C997",
-    "proxyRegistryAddress": "0x4678f0a6958e4D2Bc4F1BAF7Bc52E8F3564f3fE4"
+    "proxyRegistryAddress": "0x4678f0a6958e4D2Bc4F1BAF7Bc52E8F3564f3fE4",
+    "dssCdpManagerAddress": "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
   },
   "mainnet-ganache" : {
     "vatAddress": "0x35D1b3F3D7966A1DFe207aa4514C12a259A0492B",
@@ -55,7 +56,8 @@
     "fyDaiLP21MarAddress" : "0xb39221E6790Ae8360B7E8C1c7221900fad9397f9",
     "fyDaiLP21SepAddress" : "0x8EcC94a91b5CF03927f5eb8c60ABbDf48F82b0b3", 
     "proxyFactoryAddress" : "0xA26e15C895EFc0616177B7c1e7270A4C7D51C997",
-    "proxyRegistryAddress": "0x4678f0a6958e4D2Bc4F1BAF7Bc52E8F3564f3fE4"
+    "proxyRegistryAddress": "0x4678f0a6958e4D2Bc4F1BAF7Bc52E8F3564f3fE4",
+    "dssCdpManagerAddress": "0x5ef30b9986345249bc32d8928B7ee64DE9435E39"
   },
   "kovan" : {
     "vatAddress" : "0x6bc7e78A37ad82813fB1ab9353Dd447b400Ff06e",
@@ -84,7 +86,8 @@
     "fyDaiLP21MarAddress" : "0x45BBA2726C3B6305162C01EaDeb801700571Cd56",
     "fyDaiLP21SepAddress" : "0x10F1c69f0e16dF4251C181E9e85cd25B8657D192",
     "proxyFactoryAddress": "0xe11E3b391F7E8bC47247866aF32AF67Dd58Dc800",
-    "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C"
+    "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C",
+    "dssCdpManagerAddress": "0x1476483dD8C35F25e568113C5f70249D3976ba21"
   },
   "kovan-fork" : {
     "vatAddress" : "0x6bc7e78A37ad82813fB1ab9353Dd447b400Ff06e",
@@ -113,6 +116,7 @@
     "fyDaiLP21MarAddress" : "0x45BBA2726C3B6305162C01EaDeb801700571Cd56",
     "fyDaiLP21SepAddress" : "0x10F1c69f0e16dF4251C181E9e85cd25B8657D192",
     "proxyFactoryAddress": "0xe11E3b391F7E8bC47247866aF32AF67Dd58Dc800",
-    "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C"
+    "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C",
+    "dssCdpManagerAddress": "0x1476483dD8C35F25e568113C5f70249D3976ba21"
   }
 }
