@@ -9,7 +9,7 @@ import { id } from 'ethers/lib/utils'
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, wethTokens1, mulRay, bnify, MAX, name, chainId } from './shared/utils'
+import { WETH, rate1, wethTokens1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX } from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -90,7 +90,7 @@ contract('ExportProxy', async (accounts) => {
 
   it('does not allow to move more debt than existing in env', async () => {
     await expectRevert(
-      exportProxy.exportPosition(pool1.address, wethTokens1, fyDaiTokens1, { from: user }),
+      exportProxy.exportPosition(pool1.address, wethTokens1, fyDaiTokens1, toRay(1), { from: user }),
       'ExportProxy: Not enough debt in Yield'
     )
   })
@@ -101,8 +101,19 @@ contract('ExportProxy', async (accounts) => {
     await controller.borrow(WETH, maturity1, user, user, toBorrow, { from: user })
 
     await expectRevert(
-      exportProxy.exportPosition(pool1.address, bnify(wethTokens1).mul(2), toBorrow, { from: user }),
+      exportProxy.exportPosition(pool1.address, bnify(wethTokens1).mul(2), toBorrow, toRay(1), { from: user }),
       'ExportProxy: Not enough collateral in Yield'
+    )
+  })
+
+  it('does not allow to migrate if maximum fyDai price exceeded', async () => {
+    await env.postWeth(user, wethTokens1)
+    const toBorrow = (await env.unlockedOf(WETH, user)).toString()
+    await controller.borrow(WETH, maturity1, user, user, toBorrow, { from: user })
+
+    await expectRevert(
+      exportProxy.exportPosition(pool1.address, wethTokens1, toBorrow, toRay(0.5), { from: user }),
+      'ExportProxy: Maximum fyDai price exceeded'
     )
   })
 
@@ -124,7 +135,7 @@ contract('ExportProxy', async (accounts) => {
     // Will need this one for testing. As time passes, even for one block, the resulting dai debt will be higher than this value
     const makerDebtEstimate = await pool1.buyFYDaiPreview(toBorrow)
 
-    await exportProxy.exportPosition(pool1.address, wethTokens1, toBorrow, { from: user })
+    await exportProxy.exportPosition(pool1.address, wethTokens1, toBorrow, toRay(1), { from: user })
 
     assert.equal(await fyDai1.balanceOf(exportProxy.address), 0)
     assert.equal(await dai.balanceOf(exportProxy.address), 0)
@@ -159,6 +170,6 @@ contract('ExportProxy', async (accounts) => {
     const controllerSig = sign(controllerDigest, userPrivateKey)
     await vat.hope(exportProxy.address, { from: user }) // Allowing ExportProxy to manipulate debt for user in MakerDAO
 
-    await exportProxy.exportPositionWithSignature(pool1.address, wethTokens1, toBorrow, controllerSig, { from: user })
+    await exportProxy.exportPositionWithSignature(pool1.address, wethTokens1, toBorrow, toRay(1), controllerSig, { from: user })
   })
 })

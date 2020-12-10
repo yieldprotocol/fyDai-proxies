@@ -65,7 +65,8 @@ contract ExportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from Yield to MakerDAO. Needs to be high enough to collateralize the dai debt in MakerDAO,
     /// and low enough to make sure that debt left in Yield is also collateralized.
     /// @param fyDaiAmount fyDai debt to move from Yield to MakerDAO.
-    function exportPosition(IPool pool, uint256 wethAmount, uint256 fyDaiAmount) public {
+    /// @param maxFYDaiPrice Maximum Dai price to pay for fyDai.
+    function exportPosition(IPool pool, uint256 wethAmount, uint256 fyDaiAmount, uint256 maxFYDaiPrice) public {
         IFYDai fyDai = pool.fyDai();
 
         // The user specifies the fyDai he wants to move, and the weth to be passed on as collateral
@@ -80,17 +81,19 @@ contract ExportProxy is DecimalMath, IFlashMinter {
         // Flash mint the fyDai
         fyDai.flashMint(
             fyDaiAmount,
-            abi.encode(pool, msg.sender, wethAmount)
+            abi.encode(pool, msg.sender, wethAmount, maxFYDaiPrice)
         ); // The daiAmount encoded is ignored
     }
 
     /// @dev Callback from `FYDai.flashMint()`
+    /// @param fyDaiAmount fyDai debt to move from Yield to MakerDAO.
+    /// @param data Packed structure with pool, user, weth collateral to move, and maximum Dai price to pay for fyDai.
     function executeOnFlashMint(uint256 fyDaiAmount, bytes calldata data) external override {
-        (IPool pool, address user, uint256 wethAmount) = 
-            abi.decode(data, (IPool, address, uint256));
+        (IPool pool, address user, uint256 wethAmount, uint256 maxFYDaiPrice) = 
+            abi.decode(data, (IPool, address, uint256, uint256));
         require(msg.sender == address(IPool(pool).fyDai()), "ExportProxy: Restricted callback");
 
-        _exportPosition(pool, user, wethAmount, fyDaiAmount);
+        _exportPosition(pool, user, wethAmount, fyDaiAmount, maxFYDaiPrice);
     }
 
     /// @dev Internal function to transfer debt and collateral from Yield to MakerDAO
@@ -101,7 +104,15 @@ contract ExportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from Yield to MakerDAO. Needs to be high enough to collateralize the dai debt in MakerDAO,
     /// and low enough to make sure that debt left in Yield is also collateralized.
     /// @param fyDaiAmount fyDai debt to move from Yield to MakerDAO.
-    function _exportPosition(IPool pool, address user, uint256 wethAmount, uint256 fyDaiAmount) internal {
+    /// @param maxFYDaiPrice Maximum Dai price to pay for fyDai.
+    function _exportPosition(IPool pool, address user, uint256 wethAmount, uint256 fyDaiAmount, uint256 maxFYDaiPrice) internal {
+        // We are going to need to buy the FYDai back with Dai borrowed from Maker
+        uint256 daiAmount = pool.buyFYDaiPreview(fyDaiAmount.toUint128());
+        require(
+            daiAmount <= muld(fyDaiAmount, maxFYDaiPrice),
+            "ExportProxy: Maximum fyDai price exceeded"
+        );
+        
         IFYDai fyDai = IFYDai(pool.fyDai());
 
         // Pay the Yield debt - ExportProxy pays FYDai to remove the debt of `user`
@@ -113,9 +124,6 @@ contract ExportProxy is DecimalMath, IFlashMinter {
 
         // Post the collateral to Maker, in the `user` vault
         wethJoin.join(user, wethAmount);
-
-        // We are going to need to buy the FYDai back with Dai borrowed from Maker
-        uint256 daiAmount = pool.buyFYDaiPreview(fyDaiAmount.toUint128());
 
         // Borrow the Dai from Maker
         (, uint256 rate,,,) = vat.ilks(WETH); // Retrieve the MakerDAO stability fee for Weth
@@ -154,9 +162,10 @@ contract ExportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from Yield to MakerDAO. Needs to be high enough to collateralize the dai debt in MakerDAO,
     /// and low enough to make sure that debt left in Yield is also collateralized.
     /// @param fyDaiAmount fyDai debt to move from Yield to MakerDAO.
+    /// @param maxFYDaiPrice Maximum Dai price to pay for fyDai.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
-    function exportPositionWithSignature(IPool pool, uint256 wethAmount, uint256 fyDaiAmount, bytes memory controllerSig) public {
+    function exportPositionWithSignature(IPool pool, uint256 wethAmount, uint256 fyDaiAmount, uint256 maxFYDaiPrice, bytes memory controllerSig) public {
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
-        return exportPosition(pool, wethAmount, fyDaiAmount);
+        return exportPosition(pool, wethAmount, fyDaiAmount, maxFYDaiPrice);
     }
 }
