@@ -9,7 +9,7 @@ import { id } from 'ethers/lib/utils'
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, mulRay, bnify, MAX, name, chainId, ZERO } from './shared/utils'
+import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO } from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -128,7 +128,7 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), { from: user }),
+      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), toRay(2), { from: user }),
       'ImportProxy: Not enough debt in Maker'
     )
   })
@@ -149,8 +149,29 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, { from: user }),
+      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, toRay(2), { from: user }),
       'ImportProxy: Not enough collateral in Maker'
+    )
+  })
+
+  it('does not allow to migrate if maximum Dai price exceeded', async () => {
+    await env.maker.getDai(user, daiTokens1, rate1)
+    await vat.hope(importProxy.address, { from: user })
+    await importProxy.hope(user, { from: user })
+    await vat.fork(
+      WETH,
+      user,
+      importProxy.address,
+      (await vat.urns(WETH, user)).ink,
+      (await vat.urns(WETH, user)).art,
+      { from: user }
+    )
+    const daiDebt = bnify((await vat.urns(WETH, importProxy.address)).art).toString()
+    const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
+
+    await expectRevert(
+      importProxy.importFromProxy(pool1.address, user, wethCollateral, daiDebt, toRay(1), { from: user }),
+      'ImportProxy: Maximum Dai price exceeded'
     )
   })
 
@@ -205,7 +226,7 @@ contract('ImportProxy', async (accounts) => {
       { from: user }
     )
 
-    await importProxy.importFromProxy(pool1.address, user, wethCollateral, daiDebt, { from: user })
+    await importProxy.importFromProxy(pool1.address, user, wethCollateral, daiDebt, toRay(2), { from: user })
 
     assert.equal(await fyDai1.balanceOf(importProxy.address), 0)
     assert.equal(await dai.balanceOf(importProxy.address), 0)
@@ -244,7 +265,7 @@ contract('ImportProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importProxy.contract.methods
-      .importPosition(pool1.address, user, wethCollateral, daiDebt)
+      .importPosition(pool1.address, user, wethCollateral, daiDebt, toRay(2))
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importProxy.address, calldata, {
       from: user,
@@ -287,7 +308,7 @@ contract('ImportProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importProxy.contract.methods
-      .importPositionWithSignature(pool1.address, user, wethCollateral, daiDebt, controllerSig)
+      .importPositionWithSignature(pool1.address, user, wethCollateral, daiDebt, toRay(2), controllerSig)
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importProxy.address, calldata, {
       from: user,
@@ -296,14 +317,14 @@ contract('ImportProxy', async (accounts) => {
 
   it('fork and split is restricted to vault owners or their proxies', async () => {
     await expectRevert(
-      importProxy.importPosition(pool1.address, user, 1, 1, { from: owner }),
+      importProxy.importPosition(pool1.address, user, 1, 1, toRay(2), { from: owner }),
       'Restricted to user or its dsproxy'
     )
   })
 
   it('importFromProxy is restricted to vault owners or their proxies', async () => {
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, 1, 1, { from: owner }),
+      importProxy.importFromProxy(pool1.address, user, 1, 1, toRay(2), { from: owner }),
       'Restricted to user or its dsproxy'
     )
   })

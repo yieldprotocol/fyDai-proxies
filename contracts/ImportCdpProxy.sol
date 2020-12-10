@@ -93,6 +93,7 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// @param cdp CDP Vault to import
     /// @param wethAmount Weth collateral to import
     /// @param debtAmount Normalized debt to move ndai * rate = dai
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     function importCdpPosition(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
         address user = cdpMgr.owns(cdp);
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "ImportCdpProxy: Restricted to user or its dsproxy"); // Redundant?
@@ -106,6 +107,7 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
     /// @param cdp CDP Vault to import
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     function importCdp(IPool pool, uint256 cdp, uint256 maxDaiPrice) public {
         (uint256 ink, uint256 art) = vat.urns(WETH, cdpMgr.urns(cdp));
         importCdpPosition(pool, cdp, ink, art, maxDaiPrice);
@@ -141,12 +143,16 @@ contract ImportCdpProxy is DecimalMath, IFlashMinter {
             wethAmount <= ink,
             "ImportCdpProxy: Not enough collateral in Maker"
         );
-        // Flash mint the fyDai
-        IFYDai fyDai = pool.fyDai();
         (, uint256 rate,,,) = vat.ilks(WETH);
         uint256 daiNeeded = muld(debtAmount, rate);
         uint256 fyDaiAmount = pool.buyDaiPreview(daiNeeded.toUint128());
-        require(fyDaiAmount <= muld(daiNeeded, maxDaiPrice), "ImportCdpProxy: Maximum Dai price exceeded");
+        require(
+            fyDaiAmount <= muld(daiNeeded, maxDaiPrice),
+            "ImportCdpProxy: Maximum Dai price exceeded"
+        );
+
+        // Flash mint the fyDai
+        IFYDai fyDai = pool.fyDai();
         fyDai.flashMint(
             fyDaiAmount,
             abi.encode(pool, user, cdp, wethAmount, debtAmount)
