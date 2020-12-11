@@ -8,6 +8,8 @@ import "./interfaces/IFYDai.sol";
 import "./interfaces/ITreasury.sol";
 import "./interfaces/IController.sol";
 import "./interfaces/IPool.sol";
+import "./interfaces/ICPool.sol";
+import "./interfaces/ICToken.sol";
 import "./helpers/DecimalMath.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
@@ -46,9 +48,8 @@ contract RollProxy is DecimalMath {
     y2 = ((z1 + c1 * y1) - z2) * c2
     */
 
-
     // Migrate assumes that the series is the same in both pools
-    function migrateLiquidity(IPool pool1, IPool pool2, uint256 poolTokens) public returns (uint256 minted) {
+    function migratePoolLiquidity(IPool pool1, IPool pool2, uint256 poolTokens) public returns (uint256 minted) {
         IFYDai fyDai = pool1.fyDai();
         require(fyDai == pool2.fyDai(), "RollProxy: Migrate between same series");
 
@@ -68,6 +69,46 @@ contract RollProxy is DecimalMath {
             uint256 daiToAdd = fyDaiObtained.mul(UNIT).div(fyDaiReserves.mul(UNIT).div(daiReserves));
             minted = pool2.mint(address(this), msg.sender, daiToAdd);
             controller.repayDai(CHAI, fyDai.maturity(), address(this), msg.sender, daiObtained.sub(daiToAdd));
+        }
+
+        withdrawAssets();
+    }
+
+
+    // Migrate assumes that the series is the same in both pools
+    function migrateCPoolLiquidity(IPool pool1, ICPool pool2, uint256 poolTokens) public returns (uint256 minted) {
+        IFYDai fyDai = pool1.fyDai();
+        require(fyDai == pool2.fyDai(), "RollProxy: Migrate between same series");
+        ICToken cDai = pool2.cDai();
+
+        uint256 cDaiReserves = cDai.balanceOf(address(pool2));
+        uint256 fyDaiReserves = fyDai.balanceOf(address(pool2));
+
+        uint256 exchangeRate = cDai.exchangeRateCurrent() * 1e9; // UNIT = 1e18, converted to 1e27
+
+        // remove liquidity
+        (uint256 daiObtained, uint256 fyDaiObtained) = pool1.burn(msg.sender, address(this), poolTokens);
+
+        // convert dai to cDai
+        uint256 cDaiAvailable = divd(daiObtained, exchangeRate);
+        // require(cDai.mint(daiObtained) != 0, "RollProxy: Dai to cDai conversion failed");
+        // uint256 cDaiObtained = cDai.balanceOf(address(this)); // It would be safer to use `exchangeRate`, probably
+
+        uint256 cDaiProportion1 = cDaiAvailable.mul(UNIT).div(cDaiAvailable.add(fyDaiObtained));
+        uint256 cDaiProportion2 = cDaiReserves.mul(UNIT).div(cDaiReserves.add(fyDaiReserves));
+
+        if (cDaiProportion1 <= cDaiProportion2) {
+            require(cDai.mint(cDaiAvailable) != 0, "RollProxy: Dai to cDai conversion failed"); // Maybe check as well we got it.
+            uint256 fyDaiToAdd = cDaiAvailable.mul(UNIT).div(cDaiReserves.mul(UNIT).div(fyDaiReserves));
+
+            minted = pool2.mint(address(this), msg.sender, cDaiAvailable);
+            controller.repayFYDai(CHAI, fyDai.maturity(), address(this), msg.sender, fyDaiObtained); // repayFYDai doesn't take more than needed
+        } else {
+            uint256 cDaiToAdd = fyDaiObtained.mul(UNIT).div(fyDaiReserves.mul(UNIT).div(cDaiReserves));
+            require(cDai.mint(cDaiToAdd) != 0, "RollProxy: Dai to cDai conversion failed");
+
+            minted = pool2.mint(address(this), msg.sender, cDaiToAdd);
+            controller.repayDai(CHAI, fyDai.maturity(), address(this), msg.sender, daiObtained); // repayDai doesn't take more than needed
         }
 
         withdrawAssets();
@@ -93,7 +134,7 @@ contract RollProxy is DecimalMath {
     /// If `return[2]` is `false`, `migrateLiquidityWithSignature` must be called with a pool1 delegation signature.
     /// If `return[3]` is `false`, `migrateLiquidityWithSignature` must be called with a pool2 delegation signature.
     /// If `return` is `(true, true, true, true)`, `migrateLiquidity` won't fail because of missing approvals or signatures.
-    function migrateLiquidityCheck(IPool pool1, IPool pool2) public view returns (bool, bool, bool, bool) {
+    function migratePoolLiquidityCheck(IPool pool1, IPool pool2) public view returns (bool, bool, bool, bool) {
         bool approvals = true;
         approvals = approvals && dai.allowance(address(this), treasury) == type(uint256).max;
         approvals = approvals && chai.allowance(address(this), address(chai)) == type(uint256).max;
@@ -106,7 +147,7 @@ contract RollProxy is DecimalMath {
     }
 
     /// @dev Set proxy approvals for `migrateLiquidity` with a given pool pair.
-    function migrateLiquidityApprove(IPool, IPool pool2) public {
+    function migratePoolLiquidityApprove(IPool, IPool pool2) public {
         // Allow the Treasury to take dai when repaying
         if (dai.allowance(address(this), treasury) < type(uint256).max) dai.approve(treasury, type(uint256).max);
 
@@ -126,7 +167,7 @@ contract RollProxy is DecimalMath {
     // @param daiSig packed signature for permit of dai transfers to this proxy. Ignored if '0x'.
     // @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
     /// @return The amount of liquidity tokens minted.  
-    function migrateLiquidityWithSignature(
+    function migratePoolLiquidityWithSignature(
         IPool pool1,
         IPool pool2,
         uint256 poolTokens,
@@ -136,10 +177,10 @@ contract RollProxy is DecimalMath {
         bytes memory poolSig1,
         bytes memory poolSig2
     ) external returns (uint256) {
-        migrateLiquidityApprove(pool1, pool2);
+        migratePoolLiquidityApprove(pool1, pool2);
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
         if (poolSig1.length > 0) pool1.addDelegatePacked(poolSig1);
         if (poolSig2.length > 0) pool2.addDelegatePacked(poolSig2);
-        return migrateLiquidity(pool1, pool2, poolTokens);
+        return migratePoolLiquidity(pool1, pool2, poolTokens);
     }
 }

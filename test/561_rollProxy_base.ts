@@ -93,7 +93,7 @@ contract('RollProxy', async (accounts) => {
 
     // Setup RollProxy
     proxy = await RollProxy.new(controller.address)
-    await proxy.migrateLiquidityApprove(pool1.address, pool2.address, { from: owner })
+    await proxy.migratePoolLiquidityApprove(pool1.address, pool2.address, { from: owner })
 
     // Onboard users
     const users = [owner, user1, user2]
@@ -140,7 +140,7 @@ contract('RollProxy', async (accounts) => {
     await fyDai0.mint(owner, fyDaiToSell, { from: owner })
     await pool1.sellFYDai(owner, owner, fyDaiToSell, { from: owner })
 
-    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
+    await proxy.migratePoolLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
 
     expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
     expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
@@ -154,7 +154,7 @@ contract('RollProxy', async (accounts) => {
     await fyDai0.mint(owner, fyDaiToSell, { from: owner })
     await pool2.sellFYDai(owner, owner, fyDaiToSell, { from: owner })
 
-    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
+    await proxy.migratePoolLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
 
     expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
     expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
@@ -164,7 +164,7 @@ contract('RollProxy', async (accounts) => {
     const pool1TokensBefore = await pool1.balanceOf(user1)
     const pool2TokensBefore = await pool2.balanceOf(user1) 
 
-    await proxy.migrateLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
+    await proxy.migratePoolLiquidity(pool1.address, pool2.address, pool1TokensBefore, { from: user1 })
 
     expect(await pool1.balanceOf(user1)).to.be.bignumber.eq(ZERO)
     expect(await pool2.balanceOf(user1)).to.be.bignumber.gt(pool2TokensBefore)
