@@ -87,7 +87,7 @@
     "fyDaiLP21SepAddress" : "0x10F1c69f0e16dF4251C181E9e85cd25B8657D192",
     "proxyFactoryAddress": "0xe11E3b391F7E8bC47247866aF32AF67Dd58Dc800",
     "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C",
-    "dssCdpManagerAddress": "0x1476483dD8C35F25e568113C5f70249D3976ba21"
+    "dssCdpManagerAddress": "0xbaE800e9C26eE50DfEBB40ef808812D54Da3b791"
   },
   "kovan-fork" : {
     "vatAddress" : "0x6bc7e78A37ad82813fB1ab9353Dd447b400Ff06e",
@@ -117,6 +117,6 @@
     "fyDaiLP21SepAddress" : "0x10F1c69f0e16dF4251C181E9e85cd25B8657D192",
     "proxyFactoryAddress": "0xe11E3b391F7E8bC47247866aF32AF67Dd58Dc800",
     "proxyRegistryAddress": "0x64A436ae831C1672AE81F674CAb8B6775df3475C",
-    "dssCdpManagerAddress": "0x1476483dD8C35F25e568113C5f70249D3976ba21"
+    "dssCdpManagerAddress": "0xbaE800e9C26eE50DfEBB40ef808812D54Da3b791"
   }
 }
