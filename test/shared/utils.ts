@@ -93,7 +93,7 @@ export const linel = formatBytes32String('line')
 
 const UNIT: BigNumber = BigNumber.from(10).pow(BigNumber.from(27))
 
-export const limits = toRad(10000)
+export const limits = toRad(100000)
 
 export const spot = toRay(260) // At the time of writing, spot is 259.625048333333333333333333333, a reasonable range is [50, 1000]
 export const chi1 = toRay(1.01) // At the time of writing, chi is 1.018008449363110619399951035, a reasonable upper boundary is 1.2
