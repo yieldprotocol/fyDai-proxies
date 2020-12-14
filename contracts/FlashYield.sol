@@ -15,10 +15,10 @@ interface IFlashBorrower {
 }
 
 /**
- * FlashProxy allows flash loans of Dai out of a YieldSpace pool, by flash minting fyDai and selling it to the pool.
+ * FlashYield allows flash loans of Dai out of a YieldSpace pool, by flash minting fyDai and selling it to the pool.
  * Implements ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
  */
-contract FlashProxy {
+abstract contract FlashYield is IFlashBorrower {
     using SafeCast for uint256;
     using SafeMath for uint256;
 
@@ -27,6 +27,13 @@ contract FlashProxy {
     /// @dev ERC-3156 doesn't have provisions to choose a lender, which is what `setPool` effectively does.
     function setPool(IPool pool_) public {
         pool = pool_;
+
+        // Allow pool to take dai and fyDai for trading
+        if (pool.dai().allowance(address(this), address(pool)) < type(uint256).max)
+            pool.dai().approve(address(pool), type(uint256).max);
+        if (pool.fyDai().allowance(address(this), address(pool)) < type(uint112).max)
+            pool.fyDai().approve(address(pool), type(uint256).max);
+
     }
 
     /// @dev Fee charged on top of a Dai flash loan.
@@ -45,7 +52,7 @@ contract FlashProxy {
         data = abi.encodePacked(data, receiver);   // append receiver to data
         data = abi.encodePacked(data, msg.sender); // append msg.sender to data
         uint256 fyDaiAmount = pool.buyDaiPreview(daiAmount.toUint128());
-        IFYDai(pool.fyDai()).flashMint(fyDaiAmount, data);
+        pool.fyDai().flashMint(fyDaiAmount, data);
     }
 
     /// @dev FYDai `flashMint` callback, which bridges to the ERC-3156 `onFlashLoan` callback.
@@ -64,6 +71,12 @@ contract FlashProxy {
         uint256 fee = uint256(pool.buyFYDaiPreview(fyDaiAmount.toUint128())).sub(daiLoan);
         
         IFlashBorrower(receiver).onFlashLoan(sender, daiLoan, fee, data);
+    }
+
+    /// @dev Override this function with your own logic. Make sure the contract holds `loanAmount` + `fee` Dai
+    // and that `repayFlashLoan` is called.
+    function onFlashLoan(address sender, uint256 loanAmount, uint256 fee, bytes memory data) public override virtual {
+        repayFlashLoan(loanAmount, fee);
     }
 
     /// @dev Before the end of the transaction, `receiver` must `transfer` the `loanAmount` plus the `fee`
