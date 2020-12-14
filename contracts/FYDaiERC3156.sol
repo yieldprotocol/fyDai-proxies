@@ -12,8 +12,7 @@ interface IFlashBorrower {
 }
 
 /**
- * FYDaiERC3156 allows flash loans of fyDai out of a YieldSpace pool, by flash minting fyDai and selling it to the pool.
- * Implements ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
+ * FYDaiERC3156 allows flash loans of fyDai compliant with ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
  */
 contract FYDaiERC3156 {
     IFYDai public fyDai;
