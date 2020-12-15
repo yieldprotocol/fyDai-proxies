@@ -33,23 +33,14 @@ contract FYDaiERC3156 {
 
     /// @dev ERC-3156 entry point to send `fyDaiAmount` fyDai to `receiver` as a flash loan.
     function flashLoan(address receiver, uint256 fyDaiAmount, bytes memory data) public returns (uint256) {
-        data = abi.encodePacked(data, receiver);   // append receiver to data
-        data = abi.encodePacked(data, msg.sender); // append msg.sender to data
-        fyDai.flashMint(fyDaiAmount, data);
+        bytes memory wrappedData = abi.encode(data, msg.sender, receiver);
+        fyDai.flashMint(fyDaiAmount, wrappedData);
     }
 
     /// @dev FYDai `flashMint` callback, which bridges to the ERC-3156 `onFlashLoan` callback.
-    function executeOnFlashMint(uint256 fyDaiAmount, bytes memory data) public {
+    function executeOnFlashMint(uint256 fyDaiAmount, bytes memory wrappedData) public {
         require(msg.sender == address(fyDai), "Callbacks only allowed from fyDai contract");
-
-        address receiver;
-        address sender;
-        uint256 length = data.length;
-        assembly { 
-            receiver := mload(add(data, length))
-            sender := mload(add(data, add(length, 20)))
-        }
-        
+        (bytes memory data, address sender, address receiver) = abi.decode(wrappedData, (bytes, address, address));
         IFlashBorrower(receiver).onFlashLoan(sender, fyDaiAmount, 0, data);
     }
 }
