@@ -26,8 +26,7 @@ contract YieldDaiLender {
 
     IPool public pool;
 
-    /// @dev Choose a lending pool.
-    function setPool(IPool pool_) public {
+    constructor (IPool pool_) public {
         pool = pool_;
 
         // Allow pool to take dai and fyDai for trading
@@ -35,7 +34,6 @@ contract YieldDaiLender {
             pool.dai().approve(address(pool), type(uint256).max);
         if (pool.fyDai().allowance(address(this), address(pool)) < type(uint112).max)
             pool.fyDai().approve(address(pool), type(uint256).max);
-
     }
 
     /// @dev Fee charged on top of a Dai flash loan.
