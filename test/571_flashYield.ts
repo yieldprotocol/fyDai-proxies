@@ -1,7 +1,6 @@
 const Pool = artifacts.require('Pool')
 const FlashBorrower = artifacts.require('YieldFlashBorrowerMock')
 
-
 import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 // @ts-ignore
 import helper from 'ganache-time-traveler'
@@ -97,9 +96,8 @@ contract('YieldFlashBorrower', async (accounts) => {
     // Set up the FlashBorrower
     borrower = await FlashBorrower.new(dai.address, { from: owner })
     await borrower.setPool(pool0.address, { from: owner })
-
   })
-  
+
   it('should do a simple flash loan from an EOA', async () => {
     const ONE = new BN(toWad(1).toString())
     const loan = ONE
@@ -109,29 +107,17 @@ contract('YieldFlashBorrower', async (accounts) => {
     await env.maker.getDai(user1, ONE.toString(), rate1)
     await dai.transfer(borrower.address, ONE, { from: user1 })
 
-    const balanceBefore = (await dai.balanceOf(borrower.address))
+    const balanceBefore = await dai.balanceOf(borrower.address)
     await borrower.flashBorrow(loan, { from: user1 })
 
-    assert.equal(
-      await borrower.sender(),
-      user1,
-    )
+    assert.equal(await borrower.sender(), user1)
 
-    assert.equal(
-      (await borrower.loanAmount()).toString(),
-      loan.toString(),
-    )
+    assert.equal((await borrower.loanAmount()).toString(), loan.toString())
 
-    assert.equal(
-      (await borrower.balance()).toString(),
-      balanceBefore.add(loan).toString(),
-    )
+    assert.equal((await borrower.balance()).toString(), balanceBefore.add(loan).toString())
 
     const fee = await borrower.fee()
-    assert.equal(
-      (await dai.balanceOf(borrower.address)).toString(),
-      balanceBefore.sub(fee).toString(),
-    )
+    assert.equal((await dai.balanceOf(borrower.address)).toString(), balanceBefore.sub(fee).toString())
     almostEqual(fee.toString(), expectedFee.toString(), fee.div(new BN('100000')).toString()) // Accurate to 0.00001 %
   })
 })
