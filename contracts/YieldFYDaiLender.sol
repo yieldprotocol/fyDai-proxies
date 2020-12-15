@@ -4,17 +4,18 @@ pragma solidity ^0.6.10;
 import "./interfaces/IFYDai.sol";
 
 /**
- * IFlashBorrower receives flash loans, and is expected to repay them plus a fee.
+ * ILoanReceiver receives flash loans, and is expected to repay them plus a fee.
  * Implements ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
+ * `receiver` should verify that the `onFlashLoan` caller is in a whitelist of trusted lenders.
  */
-interface IFlashBorrower {
+interface ILoanReceiver {
     function onFlashLoan(address sender, uint256 loanAmount, uint256 fee, bytes memory data) external;
 }
 
 /**
- * FYDaiERC3156 allows flash loans of fyDai compliant with ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
+ * YieldFYDaiLender allows flash loans of fyDai compliant with ERC-3156: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3156.md
  */
-contract FYDaiERC3156 {
+contract YieldFYDaiLender {
     IFYDai public fyDai;
 
     constructor (IFYDai fyDai_) public {
@@ -41,6 +42,6 @@ contract FYDaiERC3156 {
     function executeOnFlashMint(uint256 fyDaiAmount, bytes memory wrappedData) public {
         require(msg.sender == address(fyDai), "Callbacks only allowed from fyDai contract");
         (bytes memory data, address sender, address receiver) = abi.decode(wrappedData, (bytes, address, address));
-        IFlashBorrower(receiver).onFlashLoan(sender, fyDaiAmount, 0, data);
+        ILoanReceiver(receiver).onFlashLoan(sender, fyDaiAmount, 0, data);
     }
 }

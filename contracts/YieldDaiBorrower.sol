@@ -9,9 +9,9 @@ import "./interfaces/IFYDai.sol";
 
 
 /**
- * YieldFlashBorrower allows Dai flash loans out of a YieldSpace pool, by flash minting fyDai and selling it to the pool.
+ * YieldDaiBorrower allows Dai flash loans out of a YieldSpace pool, by flash minting fyDai and selling it to the pool.
  */
-abstract contract YieldFlashBorrower {
+abstract contract YieldDaiBorrower {
     using SafeCast for uint256;
     using SafeMath for uint256;
 
@@ -67,12 +67,12 @@ abstract contract YieldFlashBorrower {
         uint256 paidFYDai = pool.buyDai(address(this), address(this), daiAmount.toUint128());
 
         uint256 fee = uint256(pool.buyFYDaiPreview(fyDaiAmount.toUint128())).sub(daiAmount);
-        onFlashLoan(sender, daiAmount, fee);
+        receiveLoan(sender, daiAmount, fee);
     }
 
     /// @dev Override this function with your own logic. Make sure the contract holds `loanAmount` + `fee` Dai
     // and that `repayFlashLoan` is called.
-    function onFlashLoan(address sender, uint256 loanAmount, uint256 fee) internal virtual {
+    function receiveLoan(address sender, uint256 loanAmount, uint256 fee) internal virtual {
         repayFlashLoan(loanAmount, fee);
     }
 

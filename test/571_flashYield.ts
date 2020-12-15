@@ -1,5 +1,5 @@
 const Pool = artifacts.require('Pool')
-const FlashBorrower = artifacts.require('YieldFlashBorrowerMock')
+const FlashBorrower = artifacts.require('YieldDaiBorrowerMock')
 
 import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 // @ts-ignore
@@ -10,7 +10,7 @@ import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtu
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
 import { assert } from 'chai'
 
-contract('YieldFlashBorrower', async (accounts) => {
+contract('YieldDaiBorrower', async (accounts) => {
   let [owner, user1] = accounts
 
   const initialDai = daiTokens1

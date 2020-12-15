@@ -2,10 +2,10 @@
 pragma solidity ^0.6.10;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../YieldFlashBorrower.sol";
+import "../YieldDaiBorrower.sol";
 
 
-contract YieldFlashBorrowerMock is YieldFlashBorrower {
+contract YieldDaiBorrowerMock is YieldDaiBorrower {
     IERC20 public immutable dai;
 
     address public sender;
@@ -19,7 +19,7 @@ contract YieldFlashBorrowerMock is YieldFlashBorrower {
 
     /// @dev Override this function with your own logic. Make sure the contract holds `loanAmount` + `fee` Dai
     // and that `repayFlashLoan` is called.
-    function onFlashLoan(address sender_, uint256 loanAmount_, uint256 fee_) internal override {
+    function receiveLoan(address sender_, uint256 loanAmount_, uint256 fee_) internal override {
         sender = sender_;
         loanAmount = loanAmount_;
         fee = fee_;
