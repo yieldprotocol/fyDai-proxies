@@ -30,7 +30,6 @@ module.exports = async (deployer, network) => {
     proxyRegistryAddress = fixed_addrs[network].proxyRegistryAddress
     dssCdpManagerAddress = fixed_addrs[network].dssCdpManagerAddress
     poolAddresses = [
-      fixed_addrs[network].fyDaiLP20OctAddress,
       fixed_addrs[network].fyDaiLP20DecAddress,
       fixed_addrs[network].fyDaiLP21MarAddress,
       fixed_addrs[network].fyDaiLP21JunAddress,
