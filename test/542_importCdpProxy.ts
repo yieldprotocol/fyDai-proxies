@@ -236,6 +236,42 @@ contract('ImportCdpProxy', async (accounts) => {
     expect(obtainedFYDaiDebt).to.be.bignumber.lt(new BN(fyDaiDebt).mul(new BN('10000')).div(new BN('9999')))
   })
 
+  it('moves maker cdp (owned by dsproxy) to yield', async () => {
+    const daiDebt = bnify((await vat.urns(WETH, urn)).art).toString()
+    const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
+
+    expect(daiDebt).to.be.bignumber.gt(ZERO)
+    expect(wethCollateral).to.be.bignumber.gt(ZERO)
+
+    const daiMaker = mulRay(daiDebt, rate1).toString()
+    const fyDaiDebt = (await pool1.buyDaiPreview(daiMaker)).toString()
+
+    // Add permissions for vault migration
+    await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
+    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
+
+    // Give CDP to static ImportCdpProxy
+    await cdpMgr.give(cdp, dsProxy.address, { from: user })
+
+    // Go!!!
+    const calldata = importCdpProxy.contract.methods
+      .importCdpPosition(pool1.address, cdp.toString(), wethCollateral, daiDebt, toRay(2))
+      .encodeABI()
+    await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
+      from: user,
+    })
+
+    assert.equal(await fyDai1.balanceOf(importCdpProxy.address), 0)
+    assert.equal(await dai.balanceOf(importCdpProxy.address), 0)
+    assert.equal(await weth.balanceOf(importCdpProxy.address), 0)
+    assert.equal((await vat.urns(WETH, user)).ink, 0)
+    assert.equal((await vat.urns(WETH, user)).art, 0)
+    assert.equal((await controller.posted(WETH, user)).toString(), wethCollateral.toString())
+    const obtainedFYDaiDebt = (await controller.debtFYDai(WETH, maturity1, user)).toString()
+    expect(obtainedFYDaiDebt).to.be.bignumber.gt(new BN(fyDaiDebt).mul(new BN('9999')).div(new BN('10000')))
+    expect(obtainedFYDaiDebt).to.be.bignumber.lt(new BN(fyDaiDebt).mul(new BN('10000')).div(new BN('9999')))
+  })
+
   it('moves half of a maker cdp to yield', async () => {
     const daiDebt = bnify((await vat.urns(WETH, urn)).art).toString()
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
@@ -308,14 +344,14 @@ contract('ImportCdpProxy', async (accounts) => {
   it('cdp migration is restricted to cdp owners or their proxies', async () => {
     await expectRevert(
       importCdpProxy.importCdpPosition(pool1.address, 1, 1, 1, toRay(2), { from: owner }),
-      'ImportCdpProxy: Restricted to user or its dsproxy'
+      'ImportCdpProxy: Restricted to cdp owner or its dsproxy'
     )
   })
 
-  it('importCdpFromProxy is restricted to cdp owners or their proxies', async () => {
+  it('importCdpFromProxy is restricted to yield vault owners or their proxies', async () => {
     await expectRevert(
       importCdpProxy.importCdpFromProxy(pool1.address, user, 1, 1, 1, toRay(2), { from: owner }),
-      'ImportCdpProxy: Restricted to user or its dsproxy'
+      'ImportCdpProxy: Restricted to yield target or its dsproxy'
     )
   })
 })

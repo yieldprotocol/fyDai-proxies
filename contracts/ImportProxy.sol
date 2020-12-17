@@ -138,7 +138,7 @@ contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
 
         // Pool should take exactly all fyDai flash minted. ImportProxy will hold the dai temporarily
         (, uint256 rate,,,) = vat.ilks(WETH);
-        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muld(debtAmount, rate).toUint128());
+        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muldrup(debtAmount, rate).toUint128());
 
         daiJoin.join(address(this), dai.balanceOf(address(this)));      // Put the Dai in Maker
         vat.frob(                           // Pay the debt and unlock collateral in Maker

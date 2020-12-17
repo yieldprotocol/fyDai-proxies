@@ -7,6 +7,7 @@ import "./helpers/DecimalMath.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
 import "./ImportProxyBase.sol";
+import "@nomiclabs/buidler/console.sol";
 
 
 interface IImportCdpProxy {
@@ -42,12 +43,22 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @param debtAmount Normalized debt to move ndai * rate = dai
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     function importCdpPosition(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
-        address user = cdpMgr.owns(cdp);
-        require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "ImportCdpProxy: Restricted to user or its dsproxy"); // Redundant?
+        address cdpOwner = cdpMgr.owns(cdp);
+        
+        require(
+            cdpOwner == msg.sender ||                           // CDP owned by the user
+            cdpOwner == proxyRegistry.proxies(msg.sender) ||    // CDP owned by the user's dsproxy
+            proxyRegistry.proxies(cdpOwner) == msg.sender,      // CDP owned by the user, which calls this function using dsproxy
+            "ImportCdpProxy: Restricted to cdp owner or its dsproxy"
+        );
 
         cdpMgr.give(cdp, address(importCdpProxy));           // Give the CDP to importCdpProxy
-        importCdpProxy.importCdpFromProxy(pool, user, cdp, wethAmount, debtAmount, maxDaiPrice); // Migrate part of the CDP to a Yield Vault
-        importCdpProxy.give(cdp, user);                      // Return the rest of the CDP to its owner
+
+        // Now `user` should be the target yield vault, either the user than owned the CDP, or the user that owned the proxy that owned the CDP
+        address yieldOwner = (cdpOwner == proxyRegistry.proxies(msg.sender)) ? msg.sender : cdpOwner;
+
+        importCdpProxy.importCdpFromProxy(pool, yieldOwner, cdp, wethAmount, debtAmount, maxDaiPrice); // Migrate part of the CDP to a Yield Vault
+        importCdpProxy.give(cdp, cdpOwner);                      // Return the rest of the CDP to its owner
     }
 
     /// @dev Migrate a CDPMgr-controlled MakerDAO vault to Yield.
@@ -72,14 +83,18 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @dev Transfer debt and collateral from MakerDAO (this contract's CDP) to Yield (user's CDP)
     /// Needs controller.addDelegate(importCdpProxy.address, { from: user });
     /// @param pool The pool to trade in (and therefore fyDai series to borrow)
-    /// @param user The user to receive the debt and collateral in Yield
+    /// @param yieldOwner The user to receive the debt and collateral in Yield
     /// @param cdp The The CDP id containing the debt and collateral to migrate
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount Normalized dai debt to move from MakerDAO to Yield. ndai * rate = dai
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
-    function importCdpFromProxy(IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
-        require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "ImportCdpProxy: Restricted to user or its dsproxy");
+    function importCdpFromProxy(IPool pool, address yieldOwner, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
+        require(
+            yieldOwner == msg.sender ||
+            proxyRegistry.proxies(yieldOwner) == msg.sender,
+            "ImportCdpProxy: Restricted to yield target or its dsproxy"
+        );
         // The user specifies the fyDai he wants to mint to cover his maker debt, the weth to be passed on as collateral, and the dai debt to move
         (uint256 ink, uint256 art) = vat.urns(WETH, cdpMgr.urns(cdp)); // Should this require be in `importPosition`?
         require(
@@ -102,35 +117,35 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
         IFYDai fyDai = pool.fyDai();
         fyDai.flashMint(
             fyDaiAmount,
-            abi.encode(pool, user, cdp, wethAmount, debtAmount)
+            abi.encode(pool, yieldOwner, cdp, wethAmount, debtAmount)
         );
     }
 
     /// @dev Callback from `FYDai.flashMint()`
     function executeOnFlashMint(uint256, bytes calldata data) external override {
-        (IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 debtAmount) = 
+        (IPool pool, address yieldOwner, uint256 cdp, uint256 wethAmount, uint256 debtAmount) = 
             abi.decode(data, (IPool, address, uint256, uint256, uint256));
         require(msg.sender == address(IPool(pool).fyDai()), "ImportCdpProxy: Callback restricted to the fyDai matching the pool");
         // require(vat.can(address(this), user) == 1, "ImportCdpProxy: Unauthorized by user");
 
-        _importCdpFromProxy(pool, user, cdp, wethAmount, debtAmount);
+        _importCdpFromProxy(pool, yieldOwner, cdp, wethAmount, debtAmount);
     }
 
     /// @dev Internal function to transfer debt and collateral from MakerDAO to Yield
     /// @param pool The pool to trade in (and therefore fyDai series to borrow)
-    /// @param user Yield Vault to receive the debt and collateral.
+    /// @param yieldOwner Yield Vault to receive the debt and collateral.
     /// @param cdp The The CDP id containing the debt and collateral to migrate
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount dai debt to move from MakerDAO to Yield. Denominated in Dai (= art * rate)
     /// Needs vat.hope(importCdpProxy.address, { from: user });
     /// Needs controller.addDelegate(importCdpProxy.address, { from: user });
-    function _importCdpFromProxy(IPool pool, address user, uint256 cdp, uint256 wethAmount, uint256 debtAmount) internal {
+    function _importCdpFromProxy(IPool pool, address yieldOwner, uint256 cdp, uint256 wethAmount, uint256 debtAmount) internal {
         IFYDai fyDai = IFYDai(pool.fyDai());
 
         // Pool should take exactly all fyDai flash minted. ImportCdpProxy will hold the dai temporarily
         (, uint256 rate,,,) = vat.ilks(WETH);
-        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muld(debtAmount, rate).toUint128());
+        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muldrup(debtAmount, rate).toUint128());
 
         // daiJoin.join(address(this), dai.balanceOf(address(this)));      // Put the Dai in Maker
         daiJoin.join(cdpMgr.urns(cdp), dai.balanceOf(address(this)));      // Put the Dai in Maker
@@ -141,8 +156,8 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
         );
         cdpMgr.flux(cdp, address(this), wethAmount);
         wethJoin.exit(address(this), wethAmount);                       // Hold the weth in ImportCdpProxy
-        controller.post(WETH, address(this), user, wethAmount);         // Add the collateral to Yield
-        controller.borrow(WETH, fyDai.maturity(), user, address(this), fyDaiSold); // Borrow the fyDai
+        controller.post(WETH, address(this), yieldOwner, wethAmount);         // Add the collateral to Yield
+        controller.borrow(WETH, fyDai.maturity(), yieldOwner, address(this), fyDaiSold); // Borrow the fyDai
     }
 
     /// --------------------------------------------------
