@@ -174,6 +174,23 @@ contract('ImportCdpProxy', async (accounts) => {
     assert.equal(result[1], true)
   })
 
+  it('checks approvals and signatures to move maker vault (owned by dsproxy) to yield', async () => {
+    let result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
+    assert.equal(result[0], false)
+    assert.equal(result[1], false)
+
+    await cdpMgr.give(cdp, dsProxy.address, { from: user })
+
+    result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
+    assert.equal(result[0], true) // The dsproxy owning the cdp is equivalent to it having a `cdpCan`
+    assert.equal(result[1], false)
+
+    await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
+    result = await importCdpProxy.importCdpPositionCheck(cdp, { from: user })
+    assert.equal(result[0], true)
+    assert.equal(result[1], true)
+  })
+
   it('moves maker cdp to yield from proxy', async () => {
     const daiDebt = bnify((await vat.urns(WETH, urn)).art).toString()
     const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
@@ -215,7 +232,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
-    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
+    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing dsProxy to manipulate the user's cdps
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
@@ -248,9 +265,8 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
-    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
 
-    // Give CDP to static ImportCdpProxy
+    // Give CDP to dsProxy
     await cdpMgr.give(cdp, dsProxy.address, { from: user })
 
     // Go!!!
@@ -283,7 +299,7 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Add permissions for vault migration
     await controller.addDelegate(importCdpProxy.address, { from: user }) // Allowing ImportCdpProxy to create debt for use in Yield
-    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
+    await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing dsProxy to manipulate the user's cdps
 
     // Move just half of the CDP
     const wethToMove = new BN(wethCollateral).div(new BN('2')).toString()
@@ -331,6 +347,38 @@ contract('ImportCdpProxy', async (accounts) => {
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
     await cdpMgr.cdpAllow(cdp, dsProxy.address, 1, { from: user }) // Allowing ImportCdpProxy to manipulate the user's cdps
+
+    // Go!!!
+    const calldata = importCdpProxy.contract.methods
+      .importCdpPositionWithSignature(pool1.address, cdp.toString(), wethCollateral, daiDebt, toRay(2), controllerSig)
+      .encodeABI()
+    await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
+      from: user,
+    })
+  })
+
+  it('moves maker cdp (owned by dsproxy) to yield with signature', async () => {
+    const daiDebt = bnify((await vat.urns(WETH, urn)).art).toString()
+    const wethCollateral = bnify((await vat.urns(WETH, urn)).ink).toString()
+    expect(daiDebt).to.be.bignumber.gt(ZERO)
+    expect(wethCollateral).to.be.bignumber.gt(ZERO)
+
+    // Give CDP to dsProxy
+    await cdpMgr.give(cdp, dsProxy.address, { from: user })
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user,
+        delegate: importCdpProxy.address,
+      },
+      (await controller.signatureCount(user)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods

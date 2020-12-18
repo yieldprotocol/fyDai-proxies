@@ -167,11 +167,19 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @dev Determine whether all approvals and signatures are in place for `importCdpPosition`.
     /// @param cdp MakerDAO CDP to import.
     /// If `return[0]` is `false`, calling `cdpMgr.cdpAllow(cdp, proxy.address, 1)` will set the MakerDAO approval.
+    /// `CdpMgr.give(cdp, dsproxy.address)` will also work, if the migration is done via dsproxy afterwards.
     /// If `return[1]` is `false`, `importCdpFromProxyWithSignature` must be called with a controller signature.
     /// If `return` is `(true, true)`, `importCdpFromProxy` won't fail because of missing approvals or signatures.
     function importCdpPositionCheck(uint256 cdp) public view returns (bool, bool) {
         bool approvals = cdpMgr.cdpCan(cdpMgr.owns(cdp), cdp, address(this)) == 1;
-        bool controllerSig = controller.delegated(msg.sender, address(importCdpProxy));
+        approvals = approvals || proxyRegistry.proxies(msg.sender) == cdpMgr.owns(cdp);
+
+        // The address which will own the yield vault is the one that must create the delegation signature
+        // The address which will own the yield vault is the one that owns the cdp, except that if the cdp is
+        // owned by dsproxy, the yield vault will be owned by the dsproxy owner
+        address yieldOwner = cdpMgr.owns(cdp);
+        if (yieldOwner == proxyRegistry.proxies(msg.sender)) yieldOwner = msg.sender;
+        bool controllerSig = controller.delegated(yieldOwner, address(importCdpProxy));
         return (approvals, controllerSig);
     }
 
@@ -179,14 +187,16 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// Needs `cdpMgr.cdpAllow(cdp, proxy.address, 1)`
     /// @param pool The pool to trade in (and therefore fyDai series to borrow)
     /// @param cdp The CDP containing the migrated debt and collateral, its owner will own the Yield vault.
+    /// If the owner is a dsproxy, the owner of the dsproxy will own the Yield vault instead.
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount dai debt to move from MakerDAO to Yield. Denominated in Dai (= art * rate)
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     /// @param controllerSig packed signature for delegation of ImportCdpProxy (not dsproxy) in the controller. Ignored if '0x'.
     function importCdpPositionWithSignature(IPool pool, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice, bytes memory controllerSig) public {
-        address user = cdpMgr.owns(cdp);
-        if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importCdpProxy), controllerSig);
+        address yieldOwner = cdpMgr.owns(cdp);
+        if (yieldOwner == proxyRegistry.proxies(msg.sender)) yieldOwner = msg.sender;
+        if (controllerSig.length > 0) controller.addDelegatePacked(yieldOwner, address(importCdpProxy), controllerSig);
         return importCdpPosition(pool, cdp, wethAmount, debtAmount, maxDaiPrice);
     }
 
@@ -194,11 +204,13 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// Needs `cdpMgr.cdpAllow(cdp, proxy.address, 1)`
     /// @param pool The pool to trade in (and therefore fyDai series to borrow)
     /// @param cdp The CDP containing the migrated debt and collateral, its owner will own the Yield vault.
+    /// If the owner is a dsproxy, the owner of the dsproxy will own the Yield vault instead.
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     /// @param controllerSig packed signature for delegation of ImportCdpProxy (not dsproxy) in the controller. Ignored if '0x'.
     function importCdpWithSignature(IPool pool, uint256 cdp, uint256 maxDaiPrice, bytes memory controllerSig) public {
-        address user = cdpMgr.owns(cdp);
-        if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importCdpProxy), controllerSig);
+        address yieldOwner = cdpMgr.owns(cdp);
+        if (yieldOwner == proxyRegistry.proxies(msg.sender)) yieldOwner = msg.sender;
+        if (controllerSig.length > 0) controller.addDelegatePacked(yieldOwner, address(importCdpProxy), controllerSig);
         return importCdp(pool, cdp, maxDaiPrice);
     }
 }
