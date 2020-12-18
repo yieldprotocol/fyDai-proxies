@@ -113,6 +113,8 @@ contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
             fyDaiAmount,
             abi.encode(pool, user, wethAmount, debtAmount)
         );
+
+        emit ImportedFromMaker(pool.fyDai().maturity(), user, user, wethAmount, daiNeeded);
     }
 
     /// @dev Callback from `FYDai.flashMint()`

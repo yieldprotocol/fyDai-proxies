@@ -119,6 +119,8 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
             fyDaiAmount,
             abi.encode(pool, yieldOwner, cdp, wethAmount, debtAmount)
         );
+
+        emit ImportedFromMaker(pool.fyDai().maturity(), cdpMgr.owns(cdp), yieldOwner, wethAmount, daiNeeded);
     }
 
     /// @dev Callback from `FYDai.flashMint()`
@@ -147,16 +149,16 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
         (, uint256 rate,,,) = vat.ilks(WETH);
         uint256 fyDaiSold = pool.buyDai(address(this), address(this), muldrup(debtAmount, rate).toUint128());
 
-        // daiJoin.join(address(this), dai.balanceOf(address(this)));      // Put the Dai in Maker
-        daiJoin.join(cdpMgr.urns(cdp), dai.balanceOf(address(this)));      // Put the Dai in Maker
-        cdpMgr.frob(                           // Pay the debt and unlock collateral in Maker
+        uint256 daiAmount = dai.balanceOf(address(this));
+        daiJoin.join(cdpMgr.urns(cdp), daiAmount);      // Put the Dai in Maker
+        cdpMgr.frob(                                    // Pay the debt and unlock collateral in Maker
             cdp,
-            -wethAmount.toInt256(),               // Removing Weth collateral
-            -debtAmount.toInt256()  // Removing Dai debt
+            -wethAmount.toInt256(),                     // Removing Weth collateral
+            -debtAmount.toInt256()                      // Removing Dai debt
         );
         cdpMgr.flux(cdp, address(this), wethAmount);
-        wethJoin.exit(address(this), wethAmount);                       // Hold the weth in ImportCdpProxy
-        controller.post(WETH, address(this), yieldOwner, wethAmount);         // Add the collateral to Yield
+        wethJoin.exit(address(this), wethAmount);                                        // Hold the weth in ImportCdpProxy
+        controller.post(WETH, address(this), yieldOwner, wethAmount);                    // Add the collateral to Yield
         controller.borrow(WETH, fyDai.maturity(), yieldOwner, address(this), fyDaiSold); // Borrow the fyDai
     }
 
