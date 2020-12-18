@@ -17,7 +17,7 @@ interface IProxyRegistry {
 
 contract ImportProxyBase {
 
-    event ImportedFromMaker(uint256 maturity, address from, address to, uint256 wethAmount, uint256 daiAmount);
+    event ImportedFromMaker(uint256 indexed maturity, address indexed from, address indexed to, uint256 wethAmount, uint256 daiAmount);
 
     IVat public immutable vat;
     IWeth public immutable weth;
