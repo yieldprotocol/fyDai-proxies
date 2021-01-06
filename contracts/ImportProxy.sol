@@ -34,7 +34,7 @@ contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @dev Fork part of a user MakerDAO vault to ImportProxy, and call importProxy to transform it into a Yield vault
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
-    /// @param user CDP Vault to import
+    /// @param user User vault to import
     /// @param wethAmount Weth collateral to import
     /// @param debtAmount Normalized debt to move ndai * rate = dai
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
