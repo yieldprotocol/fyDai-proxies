@@ -4,18 +4,20 @@ const Migrations = artifacts.require('Migrations')
 const Controller = artifacts.require('Controller')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
-const ImportProxy = artifacts.require('ImportProxy')
+const DssCdpManager = artifacts.require('DssCdpManager')
+const ImportCdpProxy = artifacts.require('ImportCdpProxy')
 
 
 module.exports = async (deployer, network) => {
 
-  let controllerAddress, proxyFactoryAddress, proxyRegistryAddress, migrations
+  let controllerAddress, proxyFactoryAddress, proxyRegistryAddress, dssCdpManagerAddress, migrations
   let poolAddresses = []
   if (network === 'development') {
     migrations = await Migrations.deployed()
     controllerAddress = (await Controller.deployed()).address
     proxyFactoryAddress = (await DSProxyFactory.deployed()).address
     proxyRegistryAddress = (await DSProxyRegistry.deployed()).address
+    dssCdpManagerAddress = (await DssCdpManager.deployed()).address
     for (let i = 0; i < (await migrations.length()); i++) {
       const contractName = web3.utils.toAscii(await migrations.names(i))
       if (!contractName.includes('fyDaiLP')) continue
@@ -25,9 +27,9 @@ module.exports = async (deployer, network) => {
     migrations = await Migrations.at(fixed_addrs[network].migrationsAddress)
     controllerAddress = fixed_addrs[network].controllerAddress
     proxyFactoryAddress = fixed_addrs[network].proxyFactoryAddress
-    proxyRegistryAddress = fixed_addrs[network].proxyRegistryAddress  
+    proxyRegistryAddress = fixed_addrs[network].proxyRegistryAddress
+    dssCdpManagerAddress = fixed_addrs[network].dssCdpManagerAddress
     poolAddresses = [
-      fixed_addrs[network].fyDaiLP20OctAddress,
       fixed_addrs[network].fyDaiLP20DecAddress,
       fixed_addrs[network].fyDaiLP21MarAddress,
       fixed_addrs[network].fyDaiLP21JunAddress,
@@ -36,11 +38,11 @@ module.exports = async (deployer, network) => {
     ]
   }
 
-  await deployer.deploy(ImportProxy, controllerAddress, poolAddresses, proxyRegistryAddress)
-  const importProxy = await ImportProxy.deployed()
+  await deployer.deploy(ImportCdpProxy, controllerAddress, poolAddresses, proxyRegistryAddress, dssCdpManagerAddress)
+  const importCdpProxy = await ImportCdpProxy.deployed()
 
   const deployment = {
-    ImportProxy: importProxy.address,
+    ImportCdpProxy: importCdpProxy.address,
   }
 
   if (migrations !== undefined && network !== 'mainnet') {

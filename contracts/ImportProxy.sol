@@ -1,82 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.6.10;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IController.sol";
-import "./interfaces/IWeth.sol";
-import "./interfaces/IGemJoin.sol";
-import "./interfaces/IDaiJoin.sol";
-import "./interfaces/IVat.sol";
-import "./interfaces/IPool.sol";
-import "./interfaces/IFYDai.sol";
 import "./interfaces/IFlashMinter.sol";
 import "./helpers/DecimalMath.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
-import "@nomiclabs/buidler/console.sol";
+import "./ImportProxyBase.sol";
+
 
 interface IImportProxy {
-    function importFromProxy(IPool, address, uint256, uint256) external;
+    function importFromProxy(IPool, address, uint256, uint256, uint256) external;
     function hope(address) external;
     function nope(address) external;
 }
 
-interface IProxyRegistry {
-    function proxies(address) external view returns (address);
-}
-
-contract ImportProxy is DecimalMath, IFlashMinter {
+contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     using SafeCast for uint256;
     using YieldAuth for IController;
 
-    IVat public immutable vat;
-    IWeth public immutable weth;
-    IERC20 public immutable dai;
-    IGemJoin public immutable wethJoin;
-    IDaiJoin public immutable daiJoin;
-    IController public immutable controller;
-    address public immutable treasury;
     IImportProxy public immutable importProxy;
-    IProxyRegistry public immutable proxyRegistry;
 
-    bytes32 public constant WETH = "ETH-A";
-    bool public constant MTY = true;
-
-    constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_) public {
-        ITreasury _treasury = controller_.treasury();
-
-        IVat _vat = _treasury.vat();
-        IWeth _weth = _treasury.weth();
-        IERC20 _dai = _treasury.dai();
-        address _daiJoin = address(_treasury.daiJoin());
-        address _wethJoin = address(_treasury.wethJoin());
-        
-
-        controller = controller_;
-        treasury = address(_treasury);
+    constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_)
+        public
+        ImportProxyBase(controller_, pools_, proxyRegistry_)
+    {
         importProxy = IImportProxy(address(this)); // This contract has two functions, as itself, and delegatecalled by a dsproxy.
-
-        proxyRegistry = proxyRegistry_;
-
-        // Allow pool to take fyDai for trading
-        for (uint i = 0 ; i < pools_.length; i++) {
-            pools_[i].fyDai().approve(address(pools_[i]), type(uint256).max);
-        }
-
-        // Allow treasury to take weth for posting
-        _weth.approve(address(_treasury), type(uint256).max);
-
-        // Allow wethJoin to move weth out of vat for this proxy
-        _vat.hope(_wethJoin);
-
-        // Allow daiJoin to take Dai for paying debt
-        _dai.approve(_daiJoin, type(uint256).max);
-
-        vat = _vat;
-        weth = _weth;
-        dai = _dai;
-        daiJoin = IDaiJoin(_daiJoin);
-        wethJoin = IGemJoin(_wethJoin);
     }
 
     /// --------------------------------------------------
@@ -86,10 +34,11 @@ contract ImportProxy is DecimalMath, IFlashMinter {
     /// @dev Fork part of a user MakerDAO vault to ImportProxy, and call importProxy to transform it into a Yield vault
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
-    /// @param user CDP Vault to import
+    /// @param user User vault to import
     /// @param wethAmount Weth collateral to import
     /// @param debtAmount Normalized debt to move ndai * rate = dai
-    function importPosition(IPool pool, address user, uint256 wethAmount, uint256 debtAmount) public {
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    function importPosition(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy"); // Redundant?
         importProxy.hope(msg.sender);                     // Allow the user or proxy to give importProxy the MakerDAO vault.
         vat.fork(                                      // Take the treasury vault
@@ -100,30 +49,31 @@ contract ImportProxy is DecimalMath, IFlashMinter {
             debtAmount.toInt256()
         );
         importProxy.nope(msg.sender);                     // Disallow the user or proxy to give importProxy the MakerDAO vault.
-        importProxy.importFromProxy(pool, user, wethAmount, debtAmount);
+        importProxy.importFromProxy(pool, user, wethAmount, debtAmount, maxDaiPrice);
     }
 
     /// @dev Fork a user MakerDAO vault to ImportProxy, and call importProxy to transform it into a Yield vault
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
     /// @param user CDP Vault to import
-    function importVault(IPool pool, address user) public {
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    function importVault(IPool pool, address user, uint256 maxDaiPrice) public {
         (uint256 ink, uint256 art) = vat.urns(WETH, user);
-        importPosition(pool, user, ink, art);
+        importPosition(pool, user, ink, art, maxDaiPrice);
     }
 
     /// --------------------------------------------------
     /// ImportProxy as itself: Maker to Yield proxy
     /// --------------------------------------------------
 
-    // Splitter accepts to take the user vault. Callable only by the user or its dsproxy
-    // Anyone can call this to donate a collateralized vault to Splitter.
+    // ImportProxy accepts to take the user vault. Callable only by the user or its dsproxy
+    // Anyone can call this to donate a collateralized vault to ImportProxy.
     function hope(address user) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         vat.hope(msg.sender);
     }
 
-    // Splitter doesn't accept to take the user vault. Callable only by the user or its dsproxy
+    // ImportProxy doesn't accept to take the user vault. Callable only by the user or its dsproxy
     function nope(address user) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         vat.nope(msg.sender);
@@ -136,7 +86,8 @@ contract ImportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount Normalized dai debt to move from MakerDAO to Yield. ndai * rate = dai
-    function importFromProxy(IPool pool, address user, uint256 wethAmount, uint256 debtAmount) public {
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    function importFromProxy(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         // The user specifies the fyDai he wants to mint to cover his maker debt, the weth to be passed on as collateral, and the dai debt to move
         (uint256 ink, uint256 art) = vat.urns(WETH, address(this));
@@ -148,13 +99,22 @@ contract ImportProxy is DecimalMath, IFlashMinter {
             wethAmount <= ink,
             "ImportProxy: Not enough collateral in Maker"
         );
+        (, uint256 rate,,,) = vat.ilks(WETH);
+        uint256 daiNeeded = muld(debtAmount, rate);
+        uint256 fyDaiAmount = pool.buyDaiPreview(daiNeeded.toUint128());
+        require(
+            fyDaiAmount <= muld(daiNeeded, maxDaiPrice),
+            "ImportProxy: Maximum Dai price exceeded"
+        );
+
         // Flash mint the fyDai
         IFYDai fyDai = pool.fyDai();
-        (, uint256 rate,,,) = vat.ilks(WETH);
         fyDai.flashMint(
-            fyDaiForDai(pool, muld(debtAmount, rate)),
+            fyDaiAmount,
             abi.encode(pool, user, wethAmount, debtAmount)
         );
+
+        emit ImportedFromMaker(pool.fyDai().maturity(), user, user, wethAmount, daiNeeded);
     }
 
     /// @dev Callback from `FYDai.flashMint()`
@@ -165,40 +125,6 @@ contract ImportProxy is DecimalMath, IFlashMinter {
         // require(vat.can(address(this), user) == 1, "ImportProxy: Unauthorized by user");
 
         _importFromProxy(pool, user, wethAmount, debtAmount);
-    }
-
-    /// @dev Convert from MakerDAO debt to Dai
-    function debtToDai(uint256 daiAmount) public view returns (uint256) {
-        (, uint256 rate,,,) = vat.ilks(WETH);
-        return muld(daiAmount, rate);
-    }
-
-    /// @dev Convert from Dai to MakerDAO debt
-    function daiToDebt(uint256 daiAmount) public view returns (uint256) {
-        (, uint256 rate,,,) = vat.ilks(WETH);
-        return divd(daiAmount, rate);
-    }
-
-    /// @dev Minimum weth needed to collateralize an amount of dai in MakerDAO
-    function wethForDai(uint256 daiAmount) public view returns (uint256) {
-        (,, uint256 spot,,) = vat.ilks(WETH);
-        return divd(daiAmount, spot);
-    }
-
-    /// @dev Minimum weth needed to collateralize an amount of fyDai in Yield. Yes, it's the same formula.
-    function wethForFYDai(uint256 fyDaiAmount) public view returns (uint256) {
-        (,, uint256 spot,,) = vat.ilks(WETH);
-        return divd(fyDaiAmount, spot);
-    }
-
-    /// @dev Amount of fyDai debt that will result from migrating Dai debt from MakerDAO to Yield
-    function fyDaiForDai(IPool pool, uint256 daiAmount) public view returns (uint256) {
-        return pool.buyDaiPreview(daiAmount.toUint128());
-    }
-
-    /// @dev Amount of dai debt that will result from migrating fyDai debt from Yield to MakerDAO
-    function daiForFYDai(IPool pool, uint256 fyDaiAmount) public view returns (uint256) {
-        return pool.buyFYDaiPreview(fyDaiAmount.toUint128());
     }
 
     /// @dev Internal function to transfer debt and collateral from MakerDAO to Yield
@@ -214,7 +140,7 @@ contract ImportProxy is DecimalMath, IFlashMinter {
 
         // Pool should take exactly all fyDai flash minted. ImportProxy will hold the dai temporarily
         (, uint256 rate,,,) = vat.ilks(WETH);
-        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muld(debtAmount, rate).toUint128());
+        uint256 fyDaiSold = pool.buyDai(address(this), address(this), muldrup(debtAmount, rate).toUint128());
 
         daiJoin.join(address(this), dai.balanceOf(address(this)));      // Put the Dai in Maker
         vat.frob(                           // Pay the debt and unlock collateral in Maker
@@ -252,14 +178,21 @@ contract ImportProxy is DecimalMath, IFlashMinter {
     /// @param wethAmount weth to move from MakerDAO to Yield. Needs to be high enough to collateralize the dai debt in Yield,
     /// and low enough to make sure that debt left in MakerDAO is also collateralized.
     /// @param debtAmount dai debt to move from MakerDAO to Yield. Denominated in Dai (= art * rate)
-    /// @param controllerSig packed signature for delegation of Splitter (not dsproxy) in the controller. Ignored if '0x'.
-    function importPositionWithSignature(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, bytes memory controllerSig) public {
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    /// @param controllerSig packed signature for delegation of ImportProxy (not dsproxy) in the controller. Ignored if '0x'.
+    function importPositionWithSignature(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice, bytes memory controllerSig) public {
         if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importProxy), controllerSig);
-        return importPosition(pool, user, wethAmount, debtAmount);
+        return importPosition(pool, user, wethAmount, debtAmount, maxDaiPrice);
     }
 
-    function importVaultWithSignature(IPool pool, address user, bytes memory controllerSig) public {
+    /// @dev Transfer a whole Vault from MakerDAO to Yield
+    /// Needs vat.hope(importProxy.address, { from: user });
+    /// @param pool The pool to trade in (and therefore fyDai series to borrow)
+    /// @param user The user migrating a vault
+    /// @param maxDaiPrice Maximum fyDai price to pay for Dai
+    /// @param controllerSig packed signature for delegation of ImportProxy (not dsproxy) in the controller. Ignored if '0x'.
+    function importVaultWithSignature(IPool pool, address user, uint256 maxDaiPrice, bytes memory controllerSig) public {
         if (controllerSig.length > 0) controller.addDelegatePacked(user, address(importProxy), controllerSig);
-        return importVault(pool, user);
+        return importVault(pool, user, maxDaiPrice);
     }
 }

@@ -4,7 +4,7 @@ const Migrations = artifacts.require('Migrations')
 const Controller = artifacts.require('Controller')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
-const ExportProxy = artifacts.require('ExportProxy')
+const ImportProxy = artifacts.require('ImportProxy')
 
 
 module.exports = async (deployer, network) => {
@@ -27,7 +27,6 @@ module.exports = async (deployer, network) => {
     proxyFactoryAddress = fixed_addrs[network].proxyFactoryAddress
     proxyRegistryAddress = fixed_addrs[network].proxyRegistryAddress  
     poolAddresses = [
-      fixed_addrs[network].fyDaiLP20OctAddress,
       fixed_addrs[network].fyDaiLP20DecAddress,
       fixed_addrs[network].fyDaiLP21MarAddress,
       fixed_addrs[network].fyDaiLP21JunAddress,
@@ -36,11 +35,11 @@ module.exports = async (deployer, network) => {
     ]
   }
 
-  await deployer.deploy(ExportProxy, controllerAddress, poolAddresses)
-  const exportProxy = await ExportProxy.deployed()
+  await deployer.deploy(ImportProxy, controllerAddress, poolAddresses, proxyRegistryAddress)
+  const importProxy = await ImportProxy.deployed()
 
   const deployment = {
-    ExportProxy: exportProxy.address,
+    ImportProxy: importProxy.address,
   }
 
   if (migrations !== undefined && network !== 'mainnet') {
