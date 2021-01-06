@@ -515,6 +515,57 @@ contract('BorrowProxy', async (accounts) => {
           'BorrowProxy: Limit not reached'
         )
       })
+
+      it('checks missing approvals and signatures for buying fyDai', async () => {
+        let result = await proxy.buyFYDaiCheck(pool.address, { from: user2 })
+
+        assert.equal(result[0], true)
+        assert.equal(result[1], false)
+        assert.equal(result[2], false)
+
+        await dai.approve(pool.address, MAX, { from: user2 })
+        result = await proxy.buyFYDaiCheck(pool.address, { from: user2 })
+
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], false)
+
+        await pool.addDelegate(proxy.address, { from: user2 })
+        result = await proxy.buyFYDaiCheck(pool.address, { from: user2 })
+
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+      })
+
+      it('buys fyDai', async () => {
+        const oneToken = new BN(toWad(1).toString())
+        const daiBalance = await dai.balanceOf(user1)
+        const fyDaiBalance = await fyDai1.balanceOf(user2)
+
+        // daiInforFYDaiOut formula: https://www.desmos.com/calculator/ws5oqj8x5i
+
+        await proxy.buyFYDai(pool.address, user2, oneToken, oneToken.muln(2), { from: user1 })
+
+        const expectedDaiIn = oneToken.divn(10000).muln(8511)
+        const daiIn = daiBalance.sub(await dai.balanceOf(user1))
+
+        assert.equal(
+          await fyDai1.balanceOf(user2),
+          fyDaiBalance.add(oneToken).toString(),
+          'User1 should have ' + fyDaiBalance.add(oneToken) + ' fyDai tokens'
+        )
+
+        expect(daiIn).to.be.bignumber.gt(expectedDaiIn.muln(9999).divn(10000))
+        expect(daiIn).to.be.bignumber.lt(expectedDaiIn.muln(10001).divn(10000))
+      })
+
+      it("doesn't buy fyDai if maximum exceeded", async () => {
+        await expectRevert(
+          proxy.buyFYDai(pool.address, user2, oneToken, oneToken.div(2), { from: user1 }),
+          'BorrowProxy: Limit exceeded'
+        )
+      })
     })
   })
 })
