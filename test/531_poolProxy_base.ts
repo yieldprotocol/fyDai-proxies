@@ -207,13 +207,14 @@ contract('PoolProxy', async (accounts) => {
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
   })
 
-  it('mints liquidity tokens buying fyDai in the pool', async () => {
+  it.only('mints liquidity tokens buying fyDai in the pool', async () => {
     const oneToken = toWad(1)
 
     const poolTokensBefore = bnify((await pool0.balanceOf(user2)).toString())
 
     const daiReserves = bnify((await dai.balanceOf(pool0.address)).toString())
-    const fyDaiReserves = bnify((await fyDai0.balanceOf(pool0.address)).toString())
+    const fyDaiRealReserves = bnify((await fyDai0.balanceOf(pool0.address)).toString())
+    const fyDaiVirtualReserves = bnify((await pool0.getFYDaiReserves()).toString())
     const maxDaiUsed = bnify(oneToken)
     const poolSupply = bnify((await pool0.totalSupply()).toString())
 
@@ -223,8 +224,8 @@ contract('PoolProxy', async (accounts) => {
     // console.log('          maxDaiUsed: %d', maxDaiUsed.toString())            // d_used
 
     // https://www.desmos.com/calculator/bl2knrktlt
-    const expectedDaiIn = daiInForMint(daiReserves, fyDaiReserves, maxDaiUsed) // d_in
-    const expectedDebt = fyDaiInForMint(daiReserves, fyDaiReserves, maxDaiUsed) // y_in
+    const expectedDaiIn = daiInForMint(daiReserves, fyDaiRealReserves, maxDaiUsed) // d_in
+    const expectedDebt = fyDaiInForMint(daiReserves, fyDaiRealReserves, maxDaiUsed) // y_in
     // console.log('          expected daiInForMint: %d', expectedDaiIn)
     // console.log('          expected fyDaiInForMint: %d', expectedDebt)
 
@@ -243,7 +244,7 @@ contract('PoolProxy', async (accounts) => {
     const lpBalanceBefore = await pool0.balanceOf(user2)
 
     const timeToMaturity = (await fyDai0.maturity()).toNumber() - (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
-    const fyDaiIn = (fyDaiForMint(daiReserves.toString(), fyDaiReserves.toString(), maxDaiUsed.toString(), timeToMaturity.toString())).toString()
+    const fyDaiIn = (fyDaiForMint(daiReserves.toString(), fyDaiRealReserves.toString(), fyDaiVirtualReserves.toString(), maxDaiUsed.toString(), timeToMaturity.toString())).toString()
     await proxy.buyAddLiquidityWithSignature(pool0.address, fyDaiIn, maxDaiUsed, '0x', '0x', '0x', { from: user2 })
 
     const debt = bnify((await controller.debtFYDai(CHAI, maturity0, user2)).toString())
