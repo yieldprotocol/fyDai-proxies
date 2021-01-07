@@ -207,7 +207,7 @@ contract('PoolProxy', async (accounts) => {
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
   })
 
-  it.only('mints liquidity tokens buying fyDai in the pool', async () => {
+  it('mints liquidity tokens buying fyDai in the pool', async () => {
     const oneToken = toWad(1)
 
     const poolTokensBefore = bnify((await pool0.balanceOf(user2)).toString())
@@ -281,35 +281,6 @@ contract('PoolProxy', async (accounts) => {
     // Proxy doesn't keep liquidity (beyond rounding)
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
     */
-  })
-
-  it('checks missing approvals and signatures for adding liquidity', async () => {
-    let result = await proxy.addLiquidityCheck(pool0.address, { from: user9 })
-
-    assert.equal(result[0], false)
-    assert.equal(result[1], false)
-    assert.equal(result[2], false)
-
-    await dai.approve(proxy.address, MAX, { from: user9 })
-    result = await proxy.addLiquidityCheck(pool0.address, { from: user9 })
-    assert.equal(result[0], false)
-    assert.equal(result[1], true)
-    assert.equal(result[2], false)
-
-    await controller.addDelegate(proxy.address, { from: user9 })
-    result = await proxy.addLiquidityCheck(pool0.address, { from: user9 })
-    assert.equal(result[0], false)
-    assert.equal(result[1], true)
-    assert.equal(result[2], true)
-
-    const oneToken = toWad(1)
-    await dai.mint(user9, oneToken, { from: owner })
-    await proxy.addLiquidityWithSignature(pool0.address, oneToken, MAX, '0x', '0x', { from: user9 })
-
-    result = await proxy.addLiquidityCheck(pool0.address, { from: user9 })
-    assert.equal(result[0], true)
-    assert.equal(result[1], true)
-    assert.equal(result[2], true)
   })
 
   it('does not allow borrowing more than max amount', async () => {
@@ -399,32 +370,6 @@ contract('PoolProxy', async (accounts) => {
       expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
     })
 
-    it('checks missing approvals and signatures for removing liquidity by selling', async () => {
-      let result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool2.address, { from: user9 })
-
-      assert.equal(result[0], false)
-      assert.equal(result[1], false)
-      assert.equal(result[2], false)
-
-      await controller.addDelegate(proxy.address, { from: user9 })
-      result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool2.address, { from: user9 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], false)
-
-      await pool2.addDelegate(proxy.address, { from: user9 })
-      result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool2.address, { from: user9 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
-
-      // Calling `addLiquidityWithSignature` also sets the right approvals
-      result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool0.address, { from: user1 })
-      assert.equal(result[0], true)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
-    })
-
     it('everyone can remove liquidity early by selling', async () => {
       const users = [user2, user3, user4, user5, user6, user7, user8]
       for (let i in users) {
@@ -494,35 +439,6 @@ contract('PoolProxy', async (accounts) => {
       expect(await fyDai0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
       // Proxy doesn't keep liquidity (beyond rounding)
       expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    })
-
-    it('checks missing approvals and signatures for removing liquidity by repaying', async () => {
-      await controller.revokeDelegate(proxy.address, { from: user2 })
-      await pool0.revokeDelegate(proxy.address, { from: user2 })
-      let result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user2 })
-
-      assert.equal(result[0], false)
-      assert.equal(result[1], false)
-      assert.equal(result[2], false)
-
-      await controller.addDelegate(proxy.address, { from: user2 })
-      result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user2 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], false)
-
-      await pool0.addDelegate(proxy.address, { from: user2 })
-      result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user2 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
-
-      const poolTokens = await pool0.balanceOf(user2)
-      await proxy.removeLiquidityEarlyDaiFixedWithSignature(pool0.address, poolTokens, '0', '0x', '0x', { from: user2 })
-      result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user2 })
-      assert.equal(result[0], true)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
     })
 
     it('removes liquidity early by repaying, and uses all in paying debt', async () => {
@@ -713,38 +629,6 @@ contract('PoolProxy', async (accounts) => {
         proxy.removeLiquidityEarlyDaiPool(pool0.address, poolTokens, '0', toRay(2), { from: user2 }),
         'PoolProxy: minimumFYDaiPrice not reached'
       )
-    })
-
-    it('checks missing approvals and signatures for removing mature liquidity', async () => {
-      await helper.advanceTime(31556952)
-      await helper.advanceBlock()
-      await fyDai0.mature()
-
-      let result = await proxy.removeLiquidityMatureCheck(pool2.address, { from: user9 })
-
-      assert.equal(result[0], false)
-      assert.equal(result[1], false)
-      assert.equal(result[2], false)
-
-      await controller.addDelegate(proxy.address, { from: user9 })
-      result = await proxy.removeLiquidityMatureCheck(pool2.address, { from: user9 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], false)
-
-      await pool2.addDelegate(proxy.address, { from: user9 })
-      result = await proxy.removeLiquidityMatureCheck(pool2.address, { from: user9 })
-      assert.equal(result[0], false)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
-
-      const poolTokens = await pool0.balanceOf(user2)
-      await proxy.removeLiquidityMatureWithSignature(pool0.address, poolTokens, '0x', '0x', { from: user2 })
-
-      result = await proxy.removeLiquidityMatureCheck(pool0.address, { from: user2 })
-      assert.equal(result[0], true)
-      assert.equal(result[1], true)
-      assert.equal(result[2], true)
     })
 
     it('removes liquidity after maturity by redeeming', async () => {
