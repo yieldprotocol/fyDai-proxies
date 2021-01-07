@@ -25,7 +25,7 @@ export function burn(daiReserves: any, fyDaiReserves: any, supply: any, lpTokens
 }
 
 // https://www.desmos.com/calculator/5nf2xuy6yb
-export function sellVYDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTillMaturity: any): any {
+export function sellDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTillMaturity: any): any {
   const fee = bignumber(1000000000000)
   const Z = bignumber(daiReserves)
   const Y = bignumber(fyDaiReserves)
@@ -42,6 +42,8 @@ export function sellVYDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTi
   const sum = subtract(add(Za, Ya), Zxa)
   const y = subtract(Y, pow(sum, invA))
   const yFee = subtract(y, fee)
+
+  if (divide(y, x) < bignumber(1)) throw new RangeError()
 
   return yFee
 }
@@ -65,11 +67,13 @@ export function sellFYDai(daiReserves: any, fyDaiReserves: any, fyDai: any, time
   const y = subtract(Z, pow(sum, invA))
   const yFee = subtract(y, fee)
 
+  if (divide(y, x) > bignumber(1)) throw new RangeError()
+
   return yFee
 }
 
 // https://www.desmos.com/calculator/0rgnmtckvy
-export function buyVYDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTillMaturity: any): any {
+export function buyDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTillMaturity: any): any {
   const fee = bignumber(1000000000000)
   const Z = bignumber(daiReserves)
   const Y = bignumber(fyDaiReserves)
@@ -85,6 +89,9 @@ export function buyVYDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTil
   const Zxa = pow(subtract(Z, x), a)
   const sum = subtract(add(Za, Ya), Zxa)
   const y = subtract(pow(sum, invA), Y)
+
+  if (divide(y, x) < bignumber(1)) throw new RangeError()
+
   const yFee = add(y, fee)
 
   return yFee
@@ -108,6 +115,8 @@ export function buyFYDai(daiReserves: any, fyDaiReserves: any, fyDai: any, timeT
   const sum = add(Za, subtract(Ya, Yxa))
   const y = subtract(pow(sum, invA), Z)
   const yFee = add(y, fee)
+
+  if (divide(y, x) > bignumber(1)) throw new RangeError()
 
   return yFee
 }
