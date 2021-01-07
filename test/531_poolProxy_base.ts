@@ -72,6 +72,12 @@ contract('PoolProxy', async (accounts) => {
     return poolSupply.mul(daiInForMint).div(daiReserves)
   }
 
+  function almostEqual(x: BigNumber, y: BigNumber, p: BigNumber) {
+    // Check that abs(x - y) < p:
+    const diff = x.gt(y) ? x.sub(y) : y.sub(x)
+    expect(diff.toString()).to.be.bignumber.lt(new BN(p.toString()))
+  }
+
   beforeEach(async () => {
     snapshot = await helper.takeSnapshot()
     snapshotId = snapshot['result']
@@ -207,81 +213,33 @@ contract('PoolProxy', async (accounts) => {
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
   })
 
-  it.only('mints liquidity tokens buying fyDai in the pool', async () => {
+  it('mints liquidity tokens buying fyDai in the pool', async () => {
     const oneToken = toWad(1)
-
-    const poolTokensBefore = bnify((await pool0.balanceOf(user2)).toString())
 
     const daiReserves = bnify((await dai.balanceOf(pool0.address)).toString())
     const fyDaiRealReserves = bnify((await fyDai0.balanceOf(pool0.address)).toString())
     const fyDaiVirtualReserves = bnify((await pool0.getFYDaiReserves()).toString())
     const maxDaiUsed = bnify(oneToken)
-    const poolSupply = bnify((await pool0.totalSupply()).toString())
 
-    // console.log('          adding liquidity...')
-    // console.log('          daiReserves: %d', daiReserves.toString())    // d_0
-    // console.log('          fyDaiReserves: %d', fyDaiReserves.toString())  // y_0
-    // console.log('          maxDaiUsed: %d', maxDaiUsed.toString())            // d_used
-
-    // https://www.desmos.com/calculator/bl2knrktlt
-    const expectedDaiIn = daiInForMint(daiReserves, fyDaiRealReserves, maxDaiUsed) // d_in
-    const expectedDebt = fyDaiInForMint(daiReserves, fyDaiRealReserves, maxDaiUsed) // y_in
-    // console.log('          expected daiInForMint: %d', expectedDaiIn)
-    // console.log('          expected fyDaiInForMint: %d', expectedDebt)
-
-    // console.log('          chi: %d', chi1)
-    const expectedPosted = postedIn(expectedDebt, chi1)
-    // console.log('          expected posted: %d', expectedPosted)         // p_chai
-
-    // https://www.desmos.com/calculator/w9qorhrjbw
-    // console.log('          Pool supply: %d', poolSupply)                 // s
-    const expectedMinted = mintedOut(poolSupply, expectedDaiIn, daiReserves) // m
-    // console.log('          expected minted: %d', expectedMinted)
 
     await dai.mint(user2, maxDaiUsed, { from: owner })
     const daiBalanceBefore = await dai.balanceOf(user2)
-    const fyDaiBalanceBefore = await fyDai0.balanceOf(user2)
-    const lpBalanceBefore = await pool0.balanceOf(user2)
 
     const timeToMaturity = (await fyDai0.maturity()).toNumber() - (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
     const fyDaiIn = (fyDaiForMint(daiReserves.toString(), fyDaiRealReserves.toString(), fyDaiVirtualReserves.toString(), maxDaiUsed.toString(), timeToMaturity.toString())).toString()
     await proxy.buyAddLiquidityWithSignature(pool0.address, fyDaiIn, maxDaiUsed, '0x', '0x', '0x', { from: user2 })
 
-    const debt = bnify((await controller.debtFYDai(CHAI, maturity0, user2)).toString())
-    const posted = bnify((await controller.posted(CHAI, user2)).toString())
-    const minted = bnify((await pool0.balanceOf(user2)).toString()).sub(poolTokensBefore)
+    const daiLeft = await dai.balanceOf(user2)
+    const daiUsed = daiBalanceBefore.sub(daiLeft)
+    const daiPrecision = bnify(maxDaiUsed).div(BigNumber.from('1000'))
+    almostEqual(bnify(daiUsed), bnify(maxDaiUsed), daiPrecision)
 
-    console.log(`Dai Offered:      ${daiBalanceBefore.toString()}`)
-    console.log(`Dai Taken:        ${daiBalanceBefore.sub(await dai.balanceOf(user2)).toString()}`)
-    console.log(`Dai Left:         ${(await dai.balanceOf(user2)).toString()}`)
-    console.log(`fyDai Bought:     ${fyDaiIn.toString()}`)
-    console.log(`fyDai Left:       ${(await fyDai0.balanceOf(user2)).toString()}`)
-    console.log(`fyDaiLP Obtained: ${lpBalanceBefore.toString()} -> ${(await pool0.balanceOf(user2)).toString()}`)
-
-    /*
-    //asserts
-    assert.equal(
-      debt.toString(),
-      expectedDebt.toString(),
-      'User2 should have ' + expectedDebt + ' fyDai debt, instead has ' + debt.toString()
-    )
-    assert.equal(
-      posted.toString(),
-      expectedPosted.toString(),
-      'User2 should have ' + expectedPosted + ' posted chai, instead has ' + posted.toString()
-    )
-    assert.equal(
-      minted.toString(),
-      expectedMinted.toString(),
-      'User2 should have ' + expectedMinted + ' pool0 tokens, instead has ' + minted.toString()
-    )
     // Proxy doesn't keep dai (beyond rounding)
     expect(await dai.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
     // Proxy doesn't keep fyDai (beyond rounding)
     expect(await fyDai0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
     // Proxy doesn't keep liquidity (beyond rounding)
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
-    */
   })
 
   it('does not allow borrowing more than max amount', async () => {
