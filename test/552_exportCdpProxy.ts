@@ -48,12 +48,7 @@ contract('ExportCdpProxy', async (accounts) => {
     pool1 = await Pool.new(dai.address, fyDai1.address, 'Name', 'Symbol', { from: owner })
 
     // Setup ExportCdpProxy
-    exportCdpProxy = await ExportCdpProxy.new(
-      controller.address,
-      [pool1.address],
-      cdpMgr.address,
-      { from: owner }
-    )
+    exportCdpProxy = await ExportCdpProxy.new(controller.address, [pool1.address], cdpMgr.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
     await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
@@ -78,7 +73,7 @@ contract('ExportCdpProxy', async (accounts) => {
     urn = await cdpMgr.urns(cdp, { from: user })
 
     // Allow ExportCdpProxy to manipulate the cdp in MakerDAO
-    await cdpMgr.cdpAllow(cdp, exportCdpProxy.address, 1, { from: user }) 
+    await cdpMgr.cdpAllow(cdp, exportCdpProxy.address, 1, { from: user })
   })
 
   it('does not allow to execute the flash mint callback to users', async () => {
@@ -86,7 +81,10 @@ contract('ExportCdpProxy', async (accounts) => {
       ['address', 'address', 'uint256', 'uint256', 'uint256'],
       [pool1.address, user, cdp.toNumber(), 1, 0]
     )
-    await expectRevert(exportCdpProxy.executeOnFlashMint(1, data, { from: user }), 'ExportCdpProxy: Restricted callback')
+    await expectRevert(
+      exportCdpProxy.executeOnFlashMint(1, data, { from: user }),
+      'ExportCdpProxy: Restricted callback'
+    )
   })
 
   it('does not allow to export to cdp not owned by the user', async () => {
@@ -96,7 +94,7 @@ contract('ExportCdpProxy', async (accounts) => {
 
     await expectRevert(
       exportCdpProxy.exportCdpPosition(pool1.address, 2, bnify(wethTokens1).mul(2), toBorrow, toRay(1), { from: user }),
-      'ExportCdpProxy: User doesn\'t have rights to the target cdp'
+      "ExportCdpProxy: User doesn't have rights to the target cdp"
     )
   })
 
@@ -113,7 +111,9 @@ contract('ExportCdpProxy', async (accounts) => {
     await controller.borrow(WETH, maturity1, user, user, toBorrow, { from: user })
 
     await expectRevert(
-      exportCdpProxy.exportCdpPosition(pool1.address, cdp, bnify(wethTokens1).mul(2), toBorrow, toRay(1), { from: user }),
+      exportCdpProxy.exportCdpPosition(pool1.address, cdp, bnify(wethTokens1).mul(2), toBorrow, toRay(1), {
+        from: user,
+      }),
       'ExportCdpProxy: Not enough collateral in Yield'
     )
   })
@@ -181,6 +181,14 @@ contract('ExportCdpProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await exportCdpProxy.exportCdpPositionWithSignature(pool1.address, cdp, wethTokens1, toBorrow, toRay(1), controllerSig, { from: user })
+    await exportCdpProxy.exportCdpPositionWithSignature(
+      pool1.address,
+      cdp,
+      wethTokens1,
+      toBorrow,
+      toRay(1),
+      controllerSig,
+      { from: user }
+    )
   })
 })

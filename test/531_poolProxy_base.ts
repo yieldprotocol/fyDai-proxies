@@ -119,7 +119,7 @@ contract('PoolProxy', async (accounts) => {
       await dai.approve(pool0.address, MAX, { from: user })
       await fyDai0.approve(pool0.address, MAX, { from: user })
       await controller.addDelegate(proxy.address, { from: user })
-      await pool0.addDelegate(proxy.address, { from: user }) 
+      await pool0.addDelegate(proxy.address, { from: user })
     }
 
     // Initialize pools
@@ -221,12 +221,18 @@ contract('PoolProxy', async (accounts) => {
     const fyDaiVirtualReserves = bnify((await pool0.getFYDaiReserves()).toString())
     const maxDaiUsed = bnify(oneToken)
 
-
     await dai.mint(user2, maxDaiUsed, { from: owner })
     const daiBalanceBefore = await dai.balanceOf(user2)
 
-    const timeToMaturity = (await fyDai0.maturity()).toNumber() - (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
-    const fyDaiIn = (fyDaiForMint(daiReserves.toString(), fyDaiRealReserves.toString(), fyDaiVirtualReserves.toString(), maxDaiUsed.toString(), timeToMaturity.toString())).toString()
+    const timeToMaturity =
+      (await fyDai0.maturity()).toNumber() - (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
+    const fyDaiIn = fyDaiForMint(
+      daiReserves.toString(),
+      fyDaiRealReserves.toString(),
+      fyDaiVirtualReserves.toString(),
+      maxDaiUsed.toString(),
+      timeToMaturity.toString()
+    ).toString()
     await proxy.buyAddLiquidityWithSignature(pool0.address, fyDaiIn, maxDaiUsed, '0x', '0x', '0x', { from: user2 })
 
     const daiLeft = await dai.balanceOf(user2)

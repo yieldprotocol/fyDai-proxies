@@ -128,7 +128,9 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), toRay(2), { from: user }),
+      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), toRay(2), {
+        from: user,
+      }),
       'ImportProxy: Not enough debt in Maker'
     )
   })
@@ -149,7 +151,9 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, toRay(2), { from: user }),
+      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, toRay(2), {
+        from: user,
+      }),
       'ImportProxy: Not enough collateral in Maker'
     )
   })
