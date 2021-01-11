@@ -360,6 +360,15 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
           .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](borrowProxy.address, calldata, { from: user1 })
       })
+
+      it('buys fyDai', async () => {
+        const oneToken = toWad(1)
+
+        const calldata = borrowProxy.contract.methods
+          .buyFYDaiWithSignature(pool.address, user2, oneToken, oneToken.mul(2), daiSig, poolSig)
+          .encodeABI()
+        await dsProxy.methods['execute(address,bytes)'](borrowProxy.address, calldata, { from: user1 })
+      })
     })
   })
 })

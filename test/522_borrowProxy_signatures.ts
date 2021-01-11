@@ -316,6 +316,14 @@ contract('BorrowProxy - Signatures', async (accounts) => {
           from: user1,
         })
       })
+
+      it('buys fyDai', async () => {
+        const oneToken = toWad(1)
+
+        await borrowProxy.buyFYDaiWithSignature(pool.address, user2, oneToken, oneToken.mul(2), daiSig, poolSig, {
+          from: user1,
+        })
+      })
     })
   })
 })

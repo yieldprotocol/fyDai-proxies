@@ -122,7 +122,7 @@ contract BorrowProxy {
     }
 
     /// @dev Sell fyDai for Dai
-    /// Caller must have approved the fyDai transfer with `fyDai.approve(fyDaiUsed)` or with `sellFYDaiWithSignature`.
+    /// Caller must have approved the fyDai transfer with `fyDai.approve(fyDaiIn)` or with `sellFYDaiWithSignature`.
     /// Caller must have approved the proxy using`pool.addDelegate(borrowProxy)` or with `sellFYDaiWithSignature`.
     /// @param to Wallet receiving the dai being bought
     /// @param fyDaiIn Amount of fyDai being sold
@@ -139,8 +139,26 @@ contract BorrowProxy {
         return daiOut;
     }
 
+    /// @dev Buy fyDai with Dai
+    /// Caller must have approved the dai transfer with `dai.approve(maxDaiIn)` or with `sellDaiWithSignature`.
+    /// Caller must have approved the proxy using`pool.addDelegate(borrowProxy)` or with `sellDaiWithSignature`.
+    /// @param to Wallet receiving the fyDai being bought
+    /// @param fyDaiOut Amount of fyDai being bought
+    /// @param maxDaiIn Maximum amount of Dai being paid for the fyDai
+    function buyFYDai(IPool pool, address to, uint128 fyDaiOut, uint128 maxDaiIn)
+        public
+        returns(uint256)
+    {
+        uint256 daiIn = pool.buyFYDai(msg.sender, to, fyDaiOut);
+        require(
+            daiIn <= maxDaiIn,
+            "BorrowProxy: Limit exceeded"
+        );
+        return daiIn;
+    }
+
     /// @dev Sell Dai for fyDai
-    /// Caller must have approved the dai transfer with `dai.approve(fyDaiUsed)` or with `sellDaiWithSignature`.
+    /// Caller must have approved the dai transfer with `dai.approve(daiIn)` or with `sellDaiWithSignature`.
     /// Caller must have approved the proxy using`pool.addDelegate(borrowProxy)` or with `sellDaiWithSignature`.
     /// @param to Wallet receiving the fyDai being bought
     /// @param daiIn Amount of dai being sold
@@ -362,16 +380,47 @@ contract BorrowProxy {
         return sellFYDai(pool, to, fyDaiIn, minDaiOut);
     }
 
-    /// @dev Determine whether all approvals and signatures are in place for `sellDai`.
+    /// @dev Determine whether all approvals and signatures are in place for `buyFYDai`.
     /// `return[0]` is always `true`, meaning that no proxy approvals are ever needed.
-    /// If `return[1]` is `false`, `sellDaiWithSignature` must be called with a dai permit signature.
-    /// If `return[2]` is `false`, `sellDaiWithSignature` must be called with a pool signature.
+    /// If `return[1]` is `false`, `buyFYDaiWithSignature` must be called with a dai permit signature.
+    /// If `return[2]` is `false`, `buyFYDaiWithSignature` must be called with a pool signature.
     /// If `return` is `(true, true, true)`, `sellDai` won't fail because of missing approvals or signatures.
-    function sellDaiCheck(IPool pool) public view returns (bool, bool, bool) {
-        bool approvals = true; // sellDai doesn't need proxy approvals
+    function buyFYDaiCheck(IPool pool) public view returns (bool, bool, bool) {
+        bool approvals = true; // buyFYDai doesn't need proxy approvals
         bool daiSig = dai.allowance(msg.sender, address(pool)) == type(uint256).max;
         bool poolSig = pool.delegated(msg.sender, address(this));
         return (approvals, daiSig, poolSig);
+    }
+
+    /// @dev Buy FYDai with Dai
+    /// @param to Wallet receiving the fyDai being bought
+    /// @param fyDaiOut Amount of fyDai being bought
+    /// @param maxDaiIn Maximum amount of Dai to pay
+    /// @param daiSig packed signature for approving Dai transfers to a pool. Ignored if '0x'.
+    /// @param poolSig packed signature for delegation of this proxy in a pool. Ignored if '0x'.
+    function buyFYDaiWithSignature(
+        IPool pool,
+        address to,
+        uint128 fyDaiOut,
+        uint128 maxDaiIn,
+        bytes memory daiSig,
+        bytes memory poolSig
+    )
+        external
+        returns(uint256)
+    {
+        if (daiSig.length > 0) dai.permitPackedDai(address(pool), daiSig);
+        if (poolSig.length > 0) pool.addDelegatePacked(poolSig);
+        return buyFYDai(pool, to, fyDaiOut, maxDaiIn);
+    }
+
+    /// @dev Determine whether all approvals and signatures are in place for `sellDai`.
+    /// `return[0]` is always `true`, meaning that no proxy approvals are ever needed.
+    /// If `return[1]` is `false`, `buyDaiWithSignature` must be called with a fyDai permit signature.
+    /// If `return[2]` is `false`, `buyDaiWithSignature` must be called with a pool signature.
+    /// If `return` is `(true, true, true)`, `sellDai` won't fail because of missing approvals or signatures.
+    function sellDaiCheck(IPool pool) public view returns (bool, bool, bool) {
+        return buyFYDaiCheck(pool);
     }
 
     /// @dev Sell Dai for fyDai
@@ -405,7 +454,7 @@ contract BorrowProxy {
         return sellFYDaiCheck(pool);
     }
 
-    /// @dev Buy Dai for fyDai and permits infinite fyDai to the pool
+    /// @dev Buy Dai for fyDai
     /// @param to Wallet receiving the dai being bought
     /// @param daiOut Amount of dai being bought
     /// @param maxFYDaiIn Maximum amount of fyDai being sold
