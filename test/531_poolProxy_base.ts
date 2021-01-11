@@ -213,6 +213,13 @@ contract('PoolProxy', async (accounts) => {
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
   })
 
+  it('does not allow borrowing more than max amount', async () => {
+    const oneToken = bnify(toWad(1))
+
+    await dai.mint(user2, oneToken, { from: owner })
+    await expectRevert(proxy.addLiquidity(pool0.address, oneToken, 1, { from: user2 }), 'PoolProxy: maxFYDai exceeded')
+  })
+
   it('mints liquidity tokens buying fyDai in the pool', async () => {
     const oneToken = toWad(1)
 
@@ -248,11 +255,29 @@ contract('PoolProxy', async (accounts) => {
     expect(await pool0.balanceOf(proxy.address)).to.be.bignumber.lt(roundingProfit)
   })
 
-  it('does not allow borrowing more than max amount', async () => {
-    const oneToken = bnify(toWad(1))
+  it('does not add liquidity with slippage', async () => {
+    const oneToken = new BN(toWad(1).toString())
 
-    await dai.mint(user2, oneToken, { from: owner })
-    await expectRevert(proxy.addLiquidity(pool0.address, oneToken, 1, { from: user2 }), 'PoolProxy: maxFYDai exceeded')
+    const daiReserves = bnify((await dai.balanceOf(pool0.address)).toString())
+    const fyDaiRealReserves = bnify((await fyDai0.balanceOf(pool0.address)).toString())
+    const fyDaiVirtualReserves = bnify((await pool0.getFYDaiReserves()).toString())
+    const maxDaiUsed = oneToken
+
+    await dai.mint(user2, maxDaiUsed, { from: owner })
+
+    const timeToMaturity =
+      (await fyDai0.maturity()).toNumber() - (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
+    const fyDaiIn = fyDaiForMint(
+      daiReserves.toString(),
+      fyDaiRealReserves.toString(),
+      fyDaiVirtualReserves.toString(),
+      maxDaiUsed.toString(),
+      timeToMaturity.toString()
+    ).toString()
+    await expectRevert(
+      proxy.buyAddLiquidityWithSignature(pool0.address, fyDaiIn, maxDaiUsed.divn(2), '0x', '0x', '0x', { from: user2 }),
+      "PoolProxy: Limit exceeded"
+    )
   })
 
   describe('with proxied liquidity', () => {
