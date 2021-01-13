@@ -7,7 +7,6 @@ import "./helpers/DecimalMath.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
 import "./ImportProxyBase.sol";
-import "@nomiclabs/buidler/console.sol";
 
 
 interface IImportCdpProxy {
@@ -37,7 +36,6 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @dev Migrate part of a CDPMgr-controlled MakerDAO vault to Yield.
     /// This function can be called from a dsproxy that already has a `vat.hope` on the user's MakerDAO Vault
     /// @param pool fyDai Pool to use for migration, determining maturity of the Yield Vault
-    // @param user User owning the CDP Vault to import
     /// @param cdp CDP Vault to import
     /// @param wethAmount Weth collateral to import
     /// @param debtAmount Normalized debt to move ndai * rate = dai
@@ -90,6 +88,7 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @param debtAmount Normalized dai debt to move from MakerDAO to Yield. ndai * rate = dai
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     function importCdpFromProxy(IPool pool, address yieldOwner, uint256 cdp, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
+        require(knownPools[address(pool)], "ImportCdpProxy: Only known pools");
         require(
             yieldOwner == msg.sender ||
             proxyRegistry.proxies(yieldOwner) == msg.sender,
@@ -127,8 +126,8 @@ contract ImportCdpProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     function executeOnFlashMint(uint256, bytes calldata data) external override {
         (IPool pool, address yieldOwner, uint256 cdp, uint256 wethAmount, uint256 debtAmount) = 
             abi.decode(data, (IPool, address, uint256, uint256, uint256));
+        require(knownPools[address(pool)], "ImportCdpProxy: Only known pools");
         require(msg.sender == address(IPool(pool).fyDai()), "ImportCdpProxy: Callback restricted to the fyDai matching the pool");
-        // require(vat.can(address(this), user) == 1, "ImportCdpProxy: Unauthorized by user");
 
         _importCdpFromProxy(pool, yieldOwner, cdp, wethAmount, debtAmount);
     }

@@ -102,6 +102,17 @@ contract('ImportCdpProxy', async (accounts) => {
     await vat.move(user, urn, rad, { from: user }) // cdpMgr.enter leaves fractions of a wei behind :(
   })
 
+  it('does not allow to execute the flash mint callback with unknown pools', async () => {
+    const data = web3.eth.abi.encodeParameters(
+      ['address', 'address', 'uint256', 'uint256', 'uint256'],
+      [user, user, 1, 1, 0]
+    )
+    await expectRevert(
+      importCdpProxy.executeOnFlashMint(1, data, { from: user }),
+      'ImportCdpProxy: Only known pools'
+    )
+  })
+
   it('does not allow to execute the flash mint callback to users', async () => {
     const data = web3.eth.abi.encodeParameters(
       ['address', 'address', 'uint256', 'uint256', 'uint256'],
@@ -112,6 +123,16 @@ contract('ImportCdpProxy', async (accounts) => {
       'ImportCdpProxy: Callback restricted to the fyDai matching the pool'
     )
   })
+
+  it('does not allow to call the static import with unknown pools', async () => {
+    await expectRevert(
+      importCdpProxy.importCdpFromProxy(user, user, cdp, 0, 0, 0, {
+        from: user,
+      }),
+      'ImportCdpProxy: Only known pools'
+    )
+  })
+
 
   it('does not allow to move more debt than existing in maker', async () => {
     // Give CDP to static ImportCdpProxy

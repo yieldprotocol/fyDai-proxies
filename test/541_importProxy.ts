@@ -101,6 +101,17 @@ contract('ImportProxy', async (accounts) => {
     assert.equal(await vat.can(importProxy.address, dsProxy.address), 0)
   })
 
+  it('does not allow to execute the flash mint with unknown pools', async () => {
+    const data = web3.eth.abi.encodeParameters(
+      ['address', 'address', 'uint256', 'uint256'],
+      [user, user, 1, 0]
+    )
+    await expectRevert(
+      importProxy.executeOnFlashMint(1, data, { from: user }),
+      'ImportProxy: Only known pools'
+    )
+  })
+
   it('does not allow to execute the flash mint callback to users', async () => {
     const data = web3.eth.abi.encodeParameters(
       ['address', 'address', 'uint256', 'uint256'],
@@ -109,6 +120,15 @@ contract('ImportProxy', async (accounts) => {
     await expectRevert(
       importProxy.executeOnFlashMint(1, data, { from: user }),
       'Callback restricted to the fyDai matching the pool'
+    )
+  })
+
+  it('does not allow to pass unknown pools to the static import function', async () => {
+    await expectRevert(
+      importProxy.importFromProxy(user, user, 0, 0, 0, {
+        from: user,
+      }),
+      'ImportProxy: Only known pools'
     )
   })
 
