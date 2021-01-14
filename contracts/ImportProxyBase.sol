@@ -29,7 +29,7 @@ contract ImportProxyBase {
 
     bytes32 public constant WETH = "ETH-A";
 
-    mapping(address => bool) knownPools;
+    mapping(address => bool) public knownPools;
 
     constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_) public {
         ITreasury _treasury = controller_.treasury();

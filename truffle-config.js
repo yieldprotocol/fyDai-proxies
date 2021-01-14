@@ -88,7 +88,7 @@ module.exports = {
       network_id: 1,         // Mainnet's id
       confirmations: 0,       // # of confs to wait between deployments. (default: 0)
       timeoutBlocks: 1000,     // # of blocks before a deployment times out  (minimum/default: 50)
-      gasPrice: 20000000000,  // 20 gwei
+      gasPrice: 100000000000,  // 100 gwei
       skipDryRun: false       // Skip dry run before migrations? (default: false for public nets )
     },
 
@@ -97,7 +97,7 @@ module.exports = {
       network_id: 42,         // Kovan's id
       confirmations: 0,       // # of confs to wait between deployments. (default: 0)
       timeoutBlocks: 200,     // # of blocks before a deployment times out  (minimum/default: 50)
-      gasPrice: 10000000000,  // 10 gwei
+      gasPrice: 100000000000,  // 100 gwei
       skipDryRun: false       // Skip dry run before migrations? (default: false for public nets )
     },
 
