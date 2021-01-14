@@ -29,6 +29,8 @@ contract ImportProxyBase {
 
     bytes32 public constant WETH = "ETH-A";
 
+    mapping(address => bool) public knownPools;
+
     constructor(IController controller_, IPool[] memory pools_, IProxyRegistry proxyRegistry_) public {
         ITreasury _treasury = controller_.treasury();
 
@@ -41,9 +43,10 @@ contract ImportProxyBase {
         controller = controller_;
         proxyRegistry = proxyRegistry_;
 
-        // Allow pool to take fyDai for trading
+        // Register pool and allow it to take fyDai for trading
         for (uint i = 0 ; i < pools_.length; i++) {
             pools_[i].fyDai().approve(address(pools_[i]), type(uint256).max);
+            knownPools[address(pools_[i])] = true;
         }
 
         // Allow treasury to take weth for posting

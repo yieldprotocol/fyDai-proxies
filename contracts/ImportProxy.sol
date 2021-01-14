@@ -88,6 +88,7 @@ contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     /// @param debtAmount Normalized dai debt to move from MakerDAO to Yield. ndai * rate = dai
     /// @param maxDaiPrice Maximum fyDai price to pay for Dai
     function importFromProxy(IPool pool, address user, uint256 wethAmount, uint256 debtAmount, uint256 maxDaiPrice) public {
+        require(knownPools[address(pool)], "ImportProxy: Only known pools");
         require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
         // The user specifies the fyDai he wants to mint to cover his maker debt, the weth to be passed on as collateral, and the dai debt to move
         (uint256 ink, uint256 art) = vat.urns(WETH, address(this));
@@ -121,8 +122,8 @@ contract ImportProxy is ImportProxyBase, DecimalMath, IFlashMinter {
     function executeOnFlashMint(uint256, bytes calldata data) external override {
         (IPool pool, address user, uint256 wethAmount, uint256 debtAmount) = 
             abi.decode(data, (IPool, address, uint256, uint256));
+        require(knownPools[address(pool)], "ImportProxy: Only known pools");
         require(msg.sender == address(IPool(pool).fyDai()), "ImportProxy: Callback restricted to the fyDai matching the pool");
-        // require(vat.can(address(this), user) == 1, "ImportProxy: Unauthorized by user");
 
         _importFromProxy(pool, user, wethAmount, debtAmount);
     }
