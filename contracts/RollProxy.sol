@@ -66,7 +66,7 @@ contract RollProxy is IERC3156FlashBorrower {
             "RollProxy: Only known pools"
         ); // Redundant, I think
         bytes memory data = abi.encode(user, collateral, pool1, pool2, minDebtRepaid, maxDaiCost);
-        lender.flashLoan(rollProxy, address(dai), daiDebtToRepay, data);
+        lender.flashLoan(rollProxy, address(dai), daiDebtToRepay, data); // <-- Make sure this is pool2 that we are borrowing from
     }
 
     /// --------------------------------------------------
@@ -141,7 +141,7 @@ contract RollProxy is IERC3156FlashBorrower {
             pool.buyDaiPreview(amount.toUint128())
         );
         require(
-            pool.buyDai(address(this), address(this), amount.toUint128()) <= maxDaiCost,
+            pool.buyDai(address(this), address(this), amount.toUint128()) <= maxDaiCost, // Not needed if merging with ERC3156FYDaiWrapper
             "RollProxy: Too much debt acquired"
         );
     }
