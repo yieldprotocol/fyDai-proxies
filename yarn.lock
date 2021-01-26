@@ -535,6 +535,11 @@
     fs-extra "^8.1.0"
     try-require "^1.2.1"
 
+"@openzeppelin/contracts@3.3.0":
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.3.0.tgz#ffdb693c5c349fc33bba420248dd3ac0a2d7c408"
+  integrity sha512-AemZEsQYtUp1WRkcmZm1div5ORfTpLquLaziCIrSagjxyKdmObxuaY1yjQ5SHFMctR8rLwp706NXTbiIRJg7pw==
+
 "@openzeppelin/contracts@^3.1.0":
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.1.0.tgz#bcea457ef89069fbe5a617f50b25b6a8272895d5"
@@ -2272,6 +2277,13 @@ enquirer@^2.3.0:
   integrity sha512-yjNnPr315/FjS4zIsUxYguYUPP2e1NK4d7E7ZOLiyYCcbFBiTMyID+2wvm2w6+pZ/odMA7cRkjhsPbltwBOrLg==
   dependencies:
     ansi-colors "^4.1.1"
+
+erc3156@0.4.4:
+  version "0.4.4"
+  resolved "https://registry.yarnpkg.com/erc3156/-/erc3156-0.4.4.tgz#92f90c41a6bcd370feeb9deabd237fdf41b9a639"
+  integrity sha512-a7STSz7LAkjdv5tWBnyVB4F6pacr73tGRyugNsAc3LOVGI2KBFlGkOWt5KYgA7mXy+8+FcbwL49BWA5TbeUIbw==
+  dependencies:
+    "@openzeppelin/contracts" "3.3.0"
 
 errno@~0.1.1:
   version "0.1.7"
