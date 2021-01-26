@@ -29,9 +29,10 @@ contract RollProxy {
         controller = controller_;
         proxyRegistry = proxyRegistry_;
 
-        // Register pool and allow it to take fyDai for trading
+        // Register pool and allow it to take dai and fyDai for trading
         for (uint i = 0 ; i < pools_.length; i++) {
             pools_[i].fyDai().approve(address(pools_[i]), type(uint256).max);
+            _dai.approve(address(pools_[i]), type(uint256).max);
             knownPools[address(pools_[i])] = true;
         }
 
@@ -58,8 +59,8 @@ contract RollProxy {
             "RollProxy: Only known pools"
         ); // Redundant, I think
 
-        bytes memory data = abi.encode(user, collateral, pool1, pool2, daiDebtToRepay, minDebtRepaid);
-        // uint256 fyDaiAmount = pool2.buyDaiPreview(daiDebtToRepay.toUint128()); // TODO: Done off-chain, as slippage protection
+        bytes memory data = abi.encode(collateral, pool1, pool2, user, daiDebtToRepay, minDebtRepaid);
+        // uint256 maxFYDaiCost = pool2.buyDaiPreview(daiDebtToRepay.toUint128()); // TODO: Done off-chain, as slippage protection
         pool2.fyDai().flashMint(maxFYDaiCost, data); // Callback from fyDai will come back to this contract
     }
 
@@ -70,8 +71,8 @@ contract RollProxy {
     )
         public
     {
-        (address user, bytes32 collateral, IPool pool1, IPool pool2, uint256 daiDebtToRepay, uint256 minDebtRepaid)
-            = abi.decode(data, (address, bytes32, IPool, IPool, uint256, uint256));
+        (bytes32 collateral, IPool pool1, IPool pool2, address user, uint256 daiDebtToRepay, uint256 minDebtRepaid)
+            = abi.decode(data, (bytes32, IPool, IPool, address, uint256, uint256));
         require(
             knownPools[address(pool1)] && knownPools[address(pool2)],
             "RollProxy: Only known pools"
@@ -82,13 +83,14 @@ contract RollProxy {
         ); // The msg.sender is the fyDai from one of the pools we know, and that we know only calls `executeOnFlashMint` in a strict loop. Therefore we can trust `data`.
 
         pool2.buyDai(address(this), address(this), daiDebtToRepay.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
-        _sellAndRepay(collateral, pool1, user, daiDebtToRepay, minDebtRepaid);        
+        _sellAndRepay(collateral, pool1, user, daiDebtToRepay, minDebtRepaid);
+        uint256 fyDaiBalance = pool2.fyDai().balanceOf(address(this));
         controller.borrow(
             collateral,
             pool2.fyDai().maturity(),
             user,
             address(this),
-            maxFYDaiCost - pool2.fyDai().balanceOf(address(this)) // TODO: SafeMath. Also, can this be abused?
+            maxFYDaiCost > fyDaiBalance ? maxFYDaiCost - fyDaiBalance : 0 // TODO: Can this be abused?
         );
 
         // emit Event(); ?
