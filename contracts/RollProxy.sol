@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.6.10;
 
-import "./interfaces/IERC3156FlashBorrower.sol";
-import "./interfaces/IERC3156FlashLender.sol";
-import "./helpers/DecimalMath.sol";
+import "erc3156/contracts/interfaces/IERC3156FlashBorrower.sol";
+import "erc3156/contracts/interfaces/IERC3156FlashLender.sol";
+import "./interfaces/IController.sol";
+import "./interfaces/IPool.sol";
+import "./interfaces/IProxyRegistry.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
-import "./ImportProxyBase.sol";
 
 
-contract RollProxy is DecimalMath, IERC3156FlashBorrower {
+contract RollProxy is IERC3156FlashBorrower {
     using SafeCast for uint256;
     using YieldAuth for IController;
 
@@ -17,6 +18,7 @@ contract RollProxy is DecimalMath, IERC3156FlashBorrower {
     IController public immutable controller;
     IProxyRegistry public immutable proxyRegistry;
     IERC3156FlashLender public immutable lender;
+    IERC3156FlashBorrower public immutable rollProxy;  // This contract has two functions, as itself, and delegatecalled by a dsproxy.
 
     bytes32 public constant WETH = "ETH-A";
 
@@ -26,11 +28,11 @@ contract RollProxy is DecimalMath, IERC3156FlashBorrower {
         public
     {
         ITreasury _treasury = controller_.treasury();
-        IERC20 _dai = _treasury.dai();
-        
+        IERC20 _dai = dai = _treasury.dai();
         controller = controller_;
         proxyRegistry = proxyRegistry_;
-        lender = _lender;
+        lender = lender_;
+        rollProxy = this;
 
         // Register pool and allow it to take fyDai for trading
         for (uint i = 0 ; i < pools_.length; i++) {
@@ -43,7 +45,7 @@ contract RollProxy is DecimalMath, IERC3156FlashBorrower {
     }
 
     /// --------------------------------------------------
-    /// RollProxy via dsproxy: Set permissions
+    /// RollProxy via dsproxy: Trigger the flash loan
     /// --------------------------------------------------
 
     function rollDebt(
@@ -51,26 +53,24 @@ contract RollProxy is DecimalMath, IERC3156FlashBorrower {
         IPool pool1,
         IPool pool2,
         address user,
-        uint256 daiAmount,
+        uint256 daiDebtToRepay,
+        uint256 minDebtRepaid,
         uint256 maxDaiCost
     ) public {
-        require(user == msg.sender || proxyRegistry.proxies(user) == msg.sender, "Restricted to user or its dsproxy");
-        require(knownPools[address(pool1)] && knownPools[address(pool2)], "RollProxy: Only known pools");
-        bytes memory data = abi.encode(user, collateral, pool1, pool2, daiAmount);
-
-        uint256 maturity1 = pool1.fyDai().maturity();
-
-        uint256 daiToBorrow = (block.timestamp >= maturity1) ?
-            pool.buyFYDaiPreview(controller.debtFYDai(collateral, maturity1, user)) :
-            controller.debtDai(collateral, maturity1, user);
-        // TODO: Add fees for pool2.sellFYDai(...)
-        require(daiToBorrow <= maxDaiCost, "RollProxy: Dai limit exceeded");
-
-        lender.flashLoan(address(rollProxy), address(dai), daiToBorrow, data);
+        require(
+            user == msg.sender || proxyRegistry.proxies(user) == msg.sender,
+            "RollProxy: Restricted to user or its dsproxy"
+        ); // Redundant, I think
+        require(
+            knownPools[address(pool1)] && knownPools[address(pool2)],
+            "RollProxy: Only known pools"
+        ); // Redundant, I think
+        bytes memory data = abi.encode(user, collateral, pool1, pool2, minDebtRepaid, maxDaiCost);
+        lender.flashLoan(rollProxy, address(dai), daiDebtToRepay, data);
     }
 
     /// --------------------------------------------------
-    /// RollProxy as itself: Do the thing
+    /// RollProxy as itself: Roll debt
     /// --------------------------------------------------
 
     /// @dev Roll debt from one maturity to another
@@ -82,28 +82,67 @@ contract RollProxy is DecimalMath, IERC3156FlashBorrower {
         uint256 fee,
         bytes calldata data
     )
-        public returns(bytes32)
+        public override returns(bytes32)
     {
-        require(msg.sender == lender, "Restricted to known lenders");
+        require(
+            msg.sender == address(lender),
+            "RollProxy: Restricted to known lenders"
+        );
 
-        (address user, bytes32 collateral, IPool pool1, IPool pool2, uint256 daiToRepay)
-            = abi.decode(data, (address, bytes32, uint256, uint256, IPool));
-        require(user == sender || proxyRegistry.proxies(user) == sender, "Restricted to user or its dsproxy"); // Someone initiating the flash loan externally couldn't affect the `user` vault of someone else.
-        require(knownPools[address(pool)], "RollProxy: Only known pools");
+        (address user, bytes32 collateral, IPool pool1, IPool pool2, uint256 minDebtRepaid, uint256 maxDaiCost)
+            = abi.decode(data, (address, bytes32, IPool, IPool, uint256, uint256));
+        require(
+            user == sender || proxyRegistry.proxies(user) == sender,
+            "RollProxy: Restricted to user or its dsproxy"
+        ); // Someone initiating the flash loan externally couldn't affect the `user` vault of someone else.
 
-        uint256 maturity1 = pool1.fyDai().maturity();
-        uint256 maturity2 = pool2.fyDai().maturity();
-
-        if (block.timestamp >= maturity1){
-            controller.repayDai(collateral, maturity1, address(this), user, amount - fee);
-        } else {
-            pool1.sellDai(address(this), address(this), amount - fee);
-            controller.repayFYDai(collateral, maturity1, address(this), user, controller.inFYDai(collateral, maturity1, amount - fee));
-        }
-        controller.borrow(collateral, maturity2, user, user, controller.inFYDai(collateral, maturity2, amount));
-        pool2.sellFYDai(address(this), address(this), controller.inFYDai(collateral, maturity2, amount));
+        _sellAndRepay(collateral, pool1, user, amount, minDebtRepaid);
+        _borrowAndBuy(collateral, pool2, user, amount + fee, maxDaiCost);
 
         // emit Event(); ?
         return keccak256("ERC3156FlashBorrower.onFlashLoan");
+    }
+
+    /// @dev Repay debt in Dai or in FYDai, depending on whether the fyDai has matured
+    function _sellAndRepay(bytes32 collateral, IPool pool, address user, uint256 amount, uint256 minDebtRepaid) private {
+        uint256 maturity = pool.fyDai().maturity();
+
+        if (block.timestamp >= maturity){
+            controller.repayDai(
+                collateral,
+                maturity,
+                address(this),
+                user,
+                amount
+            );
+        } else {
+            uint256 fyDaiDebtToRepay = pool.sellDai(address(this), address(this), amount.toUint128());
+            require(
+                controller.inDai(collateral, maturity, fyDaiDebtToRepay) >= minDebtRepaid,
+                "RollProxy: Not enough debt repaid"
+            );
+            controller.repayFYDai(
+                collateral,
+                maturity,
+                address(this),
+                user,
+                fyDaiDebtToRepay
+            );
+        }
+    }
+
+    /// @dev Borrow fyDai to buy an exact amount of Dai from a pool.
+    function _borrowAndBuy(bytes32 collateral, IPool pool, address user, uint256 amount, uint256 maxDaiCost) private {
+        controller.borrow(
+            collateral,
+            pool.fyDai().maturity(),
+            user,
+            address(this),
+            pool.buyDaiPreview(amount.toUint128())
+        );
+        require(
+            pool.buyDai(address(this), address(this), amount.toUint128()) <= maxDaiCost,
+            "RollProxy: Too much debt acquired"
+        );
     }
 }
