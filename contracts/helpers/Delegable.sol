@@ -2,6 +2,7 @@
 pragma solidity ^0.6.10;
 
 import "../interfaces/IDelegable.sol";
+import "hardhat/console.sol";
 
 
 /// @dev Delegable enables users to delegate their account management to other users.
@@ -55,6 +56,8 @@ contract Delegable is IDelegable {
     /// @dev Add a delegate through an encoded signature
     function addDelegateBySignature(address user, address delegate, uint deadline, uint8 v, bytes32 r, bytes32 s) public override {
         require(deadline >= block.timestamp, 'Delegable: Signature expired');
+        console.log("contract DELEGABLE_DOMAIN");
+        console.logBytes32(DELEGABLE_DOMAIN);
 
         bytes32 hashStruct = keccak256(
             abi.encode(
@@ -65,6 +68,8 @@ contract Delegable is IDelegable {
                 deadline
             )
         );
+        console.log("contract hashStruct");
+        console.logBytes32(hashStruct);
 
         bytes32 digest = keccak256(
             abi.encodePacked(
@@ -73,6 +78,8 @@ contract Delegable is IDelegable {
                 hashStruct
             )
         );
+        console.log("contract digest");
+        console.logBytes32(digest);
         address signer = ecrecover(digest, v, r, s);
         require(
             signer != address(0) && signer == user,

@@ -5,11 +5,10 @@ const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
 const DssCdpManager = artifacts.require('DssCdpManager')
 
-import { id } from 'ethers/lib/utils'
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO } from './shared/utils'
+import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO, functionSignature } from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -70,7 +69,7 @@ contract('ImportCdpProxy', async (accounts) => {
     )
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
 
     // Initialize Pool1
     const daiReserves = bnify(daiTokens1).mul(5)

@@ -18,10 +18,10 @@ import {
   name,
   ZERO,
   MAX,
+  functionSignature,
 } from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
 import { getSignatureDigest, getPermitDigest, getDaiDigest, userPrivateKey, sign } from './shared/signatures'
-import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 
 // @ts-ignore
 import { balance, expectRevert } from '@openzeppelin/test-helpers'
@@ -75,7 +75,7 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
     proxyRegistry = await DSProxyRegistry.new(proxyFactory.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai1.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
   })
 
   describe('collateral', () => {
@@ -274,8 +274,8 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
       const daiReserves = daiTokens1
       await env.maker.getDai(owner, daiReserves, rate1)
 
-      await fyDai1.approve(pool.address, -1, { from: owner })
-      await dai.approve(pool.address, -1, { from: owner })
+      await fyDai1.approve(pool.address, MAX, { from: owner })
+      await dai.approve(pool.address, MAX, { from: owner })
       await pool.mint(owner, owner, daiReserves, { from: owner })
 
       const fyDaiDigest = getPermitDigest(

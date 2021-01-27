@@ -36,22 +36,27 @@ export function getSignatureDigest(
   deadline: BigNumberish
 ) {
   const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
-  return keccak256(
+  console.log('DOMAIN_SEPARATOR: ' + DOMAIN_SEPARATOR)
+  const hashStruct: any = keccak256(
+    defaultAbiCoder.encode(
+      ['bytes32', 'address', 'address', 'uint256', 'uint256'],
+      [SIGNATURE_TYPEHASH, signature.user, signature.delegate, signatureCount, deadline]
+    )
+  )
+  console.log('hashStruct: ' + hashStruct)
+  const digest: any = keccak256(
     solidityPack(
       ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
       [
         '0x19',
         '0x01',
         DOMAIN_SEPARATOR,
-        keccak256(
-          defaultAbiCoder.encode(
-            ['bytes32', 'address', 'address', 'uint256', 'uint256'],
-            [SIGNATURE_TYPEHASH, signature.user, signature.delegate, signatureCount, deadline]
-          )
-        ),
+        hashStruct,
       ]
     )
   )
+  console.log('digest: ' + digest)
+  return digest
 }
 
 // Returns the EIP712 hash which should be signed by the user

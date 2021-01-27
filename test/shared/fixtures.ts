@@ -1,4 +1,5 @@
 import { formatBytes32String as toBytes32, id } from 'ethers/lib/utils'
+import { functionSignature } from './utils'
 import { BigNumber, BigNumberish } from 'ethers'
 
 export type Contract = any
@@ -157,12 +158,12 @@ export class YieldEnvironmentLite {
     const fyDaiAddrs = fyDais.map((c) => c.address)
     const controller = await Controller.new(treasury.address, fyDaiAddrs)
     const treasuryFunctions = ['pushDai', 'pullDai', 'pushChai', 'pullChai', 'pushWeth', 'pullWeth'].map((func) =>
-      id(func + '(address,uint256)')
+      functionSignature(func + '(address,uint256)')
     )
     await treasury.batchOrchestrate(controller.address, treasuryFunctions)
 
     for (const fyDai of fyDais) {
-      await fyDai.batchOrchestrate(controller.address, [id('mint(address,uint256)'), id('burn(address,uint256)')])
+      await fyDai.batchOrchestrate(controller.address, [functionSignature('mint(address,uint256)'), functionSignature('burn(address,uint256)')])
     }
 
     return controller
@@ -172,7 +173,7 @@ export class YieldEnvironmentLite {
     return await Promise.all(
       maturities.map(async (maturity) => {
         const fyDai = await FYDai.new(treasury.address, maturity, 'Name', 'Symbol')
-        await treasury.orchestrate(fyDai.address, id('pullDai(address,uint256)'))
+        await treasury.orchestrate(fyDai.address, functionSignature('pullDai(address,uint256)'))
         return fyDai
       })
     )
@@ -188,7 +189,7 @@ export class YieldEnvironmentLite {
 
   public async newFYDai(maturity: number, name: string, symbol: string) {
     const fyDai = await FYDai.new(this.treasury.address, maturity, name, symbol)
-    await this.treasury.orchestrate(fyDai.address, id('pullDai(address,uint256)'))
+    await this.treasury.orchestrate(fyDai.address, functionSignature('pullDai(address,uint256)'))
     return fyDai
   }
 
@@ -234,19 +235,19 @@ export class YieldEnvironment extends YieldEnvironmentLite {
     const { maker, treasury, controller, fyDais } = await YieldEnvironmentLite.setup(maturities)
 
     const liquidations = await Liquidations.new(controller.address)
-    await controller.orchestrate(liquidations.address, id('erase(bytes32,address)'))
+    await controller.orchestrate(liquidations.address, functionSignature('erase(bytes32,address)'))
     await treasury.batchOrchestrate(liquidations.address, [
-      id('pushDai(address,uint256)'),
-      id('pullWeth(address,uint256)'),
+      functionSignature('pushDai(address,uint256)'),
+      functionSignature('pullWeth(address,uint256)'),
     ])
 
     const unwind = await Unwind.new(maker.end.address, liquidations.address)
     await treasury.registerUnwind(unwind.address)
-    await controller.orchestrate(unwind.address, id('erase(bytes32,address)'))
-    await liquidations.orchestrate(unwind.address, id('erase(address)'))
+    await controller.orchestrate(unwind.address, functionSignature('erase(bytes32,address)'))
+    await liquidations.orchestrate(unwind.address, functionSignature('erase(address)'))
 
     for (const fyDai of fyDais) {
-      await fyDai.orchestrate(unwind.address, id('burn(address,uint256)'))
+      await fyDai.orchestrate(unwind.address, functionSignature('burn(address,uint256)'))
     }
 
     return new YieldEnvironment(maker, treasury, controller, fyDais, liquidations, unwind)
