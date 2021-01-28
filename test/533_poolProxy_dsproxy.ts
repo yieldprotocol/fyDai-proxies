@@ -4,7 +4,7 @@ const DSProxy = artifacts.require('DSProxy')
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxyRegistry = artifacts.require('ProxyRegistry')
 
-import { getSignatureDigest, getDaiDigest, user2PrivateKey, sign } from './shared/signatures'
+import { getSignatureDigest, getDaiDigest, getPermitDigest, user2PrivateKey, sign } from './shared/signatures'
 import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 // @ts-ignore
 import helper from 'ganache-time-traveler'
@@ -80,7 +80,8 @@ contract('PoolProxy - DSProxy', async (accounts) => {
   })
 
   describe('without onboarding', () => {
-    let daiSig: any, controllerSig: any, poolSig: any
+    let daiSig: any, controllerSig: any, poolSig: any, daiPoolSig: any, fyDaiPoolSig: any
+
     beforeEach(async () => {
       // user1 sets the scene, user2 will interact without onboarding
       await env.maker.chai.approve(poolProxy.address, MAX, { from: user1 })
@@ -152,6 +153,51 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         MAX
       )
       controllerSig = sign(controllerDigest, user2PrivateKey)
+
+      // Authorize the proxy for the pool0
+      const poolDigest = getSignatureDigest(
+        name,
+        pool0.address,
+        chainId,
+        {
+          user: user2,
+          delegate: dsProxy.address,
+        },
+        (await pool0.signatureCount(user2)).toString(),
+        MAX
+      )
+      poolSig = sign(poolDigest, user2PrivateKey)
+
+      // Authorize DAI for the pool0
+      const daiPoolDigest = getDaiDigest(
+        await dai.name(),
+        dai.address,
+        chainId,
+        {
+          owner: user2,
+          spender: pool0.address,
+          can: true,
+        },
+        bnify(await dai.nonces(user2)),
+        deadline
+      )
+      daiPoolSig = sign(daiPoolDigest, user2PrivateKey)
+
+
+      // Authorize fyDAI for the pool0
+      const fyDaiPoolDigest = getPermitDigest(
+        await fyDai0.name(),
+        fyDai0.address,
+        chainId,
+        {
+          owner: user2,
+          spender: pool0.address,
+          value: MAX,
+        },
+        bnify(await fyDai0.nonces(user2)),
+        deadline
+      )
+      fyDaiPoolSig = sign(fyDaiPoolDigest, user2PrivateKey)
     })
 
     it('adds liquidity', async () => {
@@ -164,6 +210,19 @@ contract('PoolProxy - DSProxy', async (accounts) => {
       const calldata = poolProxy.contract.methods
         .addLiquidityWithSignature(pool0.address, daiUsed, maxFYDai, daiSig, controllerSig)
         .encodeABI()
+      await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
+        from: user2,
+      })
+    })
+
+    it('adds liquidity by buying fyDai in the pool', async () => {
+      const oneToken = toWad(1)
+
+      await dai.mint(user2, oneToken.mul(100), { from: owner })
+
+      const calldata = poolProxy.contract.methods
+      .buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig)
+      .encodeABI()
       await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
         from: user2,
       })
