@@ -13,6 +13,7 @@ const End = artifacts.require('End')
 const Chai = artifacts.require('Chai')
 const Treasury = artifacts.require('Treasury')
 const FYDai = artifacts.require('FYDai')
+const Pool = artifacts.require('Pool')
 const Controller = artifacts.require('Controller')
 const Liquidations = artifacts.require('Liquidations')
 const Unwind = artifacts.require('Unwind')
@@ -34,7 +35,54 @@ import {
   divRay,
   divrupRay,
   mulRay,
+  toWad,
 } from './utils'
+
+export class YieldSpace {
+  protocol: YieldEnvironmentLite
+  dai: Contract
+  fyDais: Array<Contract>
+  pools: Array<Contract>
+
+  constructor(
+    protocol: YieldEnvironmentLite,
+    pools: Array<Contract>
+  ) {
+    this.protocol = protocol
+    this.dai = protocol.maker.dai
+    this.fyDais = protocol.fyDais
+    this.pools = pools
+  }
+
+  public static async setup(protocol: YieldEnvironmentLite) {
+    const pools = await this.setupPools(protocol)
+    return new YieldSpace(protocol, pools)
+  }
+
+  public static async setupPools(protocol: YieldEnvironmentLite): Promise<Array<Contract>> {
+    return await Promise.all(
+      protocol.fyDais.map(async (fyDai) => {
+        const pool = await Pool.new(protocol.maker.dai.address, fyDai.address, 'Name', 'Symbol')
+        return pool
+      })
+    )
+  }
+
+  public async initPool(pool: Contract, reserves: BigNumberish, owner: string) {
+    const fyDai: Contract = await FYDai.at(await pool.fyDai())
+    // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
+    await fyDai.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
+    const initialReserves = reserves
+    const initialFYDai = BigNumber.from(reserves).div(10)
+    await this.protocol.maker.getDai(owner, initialReserves, rate1)
+    await this.dai.approve(pool.address, initialReserves, { from: owner })
+    await pool.mint(owner, owner, initialReserves, { from: owner })
+    await fyDai.mint(owner, initialFYDai, { from: owner })
+    await fyDai.approve(pool.address, initialFYDai, { from: owner })
+    await pool.sellFYDai(owner, owner, initialFYDai, { from: owner })
+  }
+}
+
 
 export class MakerEnvironment {
   vat: Contract
