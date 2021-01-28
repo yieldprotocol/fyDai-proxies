@@ -74,7 +74,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
         controllerSig = sign(controllerDigest, userPrivateKey)
       })
 
-      it.only('allows user to withdraw weth', async () => {
+      it('allows user to withdraw weth', async () => {
         console.log(controllerSig)
         await borrowProxy.withdrawWithSignature(user2, wethTokens1, controllerSig, { from: user1 })
       })

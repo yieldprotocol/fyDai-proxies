@@ -143,7 +143,7 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
 
         it('borrows dai for maximum fyDai', async () => {
           const calldata = borrowProxy.contract.methods
-            .borrowDaiForMaximumFYDaiWithSignature(pool.address, WETH, maturity1, user2, oneToken, fyDaiTokens1, '0x')
+            .borrowDaiForMaximumFYDaiWithSignature(pool.address, WETH, maturity1, user2, oneToken.toString(), fyDaiTokens1.toString(), '0x')
             .encodeABI()
           await dsProxy.methods['execute(address,bytes)'](borrowProxy.address, calldata, { from: user1 })
 
@@ -163,7 +163,7 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
         describe('repaying', () => {
           beforeEach(async () => {
             const calldata = borrowProxy.contract.methods
-              .borrowDaiForMaximumFYDaiWithSignature(pool.address, WETH, maturity1, user2, oneToken, fyDaiTokens1, '0x')
+              .borrowDaiForMaximumFYDaiWithSignature(pool.address, WETH, maturity1, user2, oneToken.toString(), fyDaiTokens1, '0x')
               .encodeABI()
             await dsProxy.methods['execute(address,bytes)'](borrowProxy.address, calldata, { from: user1 })
 
@@ -253,7 +253,7 @@ contract('BorrowProxy - DSProxy', async (accounts) => {
                 maturity1,
                 user1,
                 0,
-                toWad(1),
+                toWad(1).toString(),
                 controllerSig,
                 poolSig
               )
