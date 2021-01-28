@@ -2,9 +2,9 @@ import { keccak256, defaultAbiCoder, toUtf8Bytes, solidityPack } from 'ethers/li
 import { BigNumberish } from 'ethers'
 import { ecsign } from 'ethereumjs-util'
 
-// https://github.com/nomiclabs/hardhat/blob/d399a60452f80a6e88d974b2b9205f4894a60d29/packages/buidler-core/src/internal/core/config/default-config.ts
-export const userPrivateKey = Buffer.from('d49743deccbccc5dc7baa8e69e5be03298da8688a15dd202e20f15d5e0e9a9fb', 'hex')
-export const user2PrivateKey = Buffer.from('23c601ae397441f3ef6f1075dcb0031ff17fb079837beadaf3c84d96c6f3e569', 'hex')
+// Private keys for hardhat's mnemonic.
+export const userPrivateKey = Buffer.from('59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d', 'hex')
+export const user2PrivateKey = Buffer.from('5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a', 'hex')
 
 export const sign = (digest: any, privateKey: any) => {
   const { v, r, s } = ecsign(Buffer.from(digest.slice(2), 'hex'), privateKey)
