@@ -47,7 +47,6 @@ contract RollProxy {
         IPool pool2,
         address user,
         uint256 daiDebtToRepay,
-        uint256 minDebtRepaid,
         uint256 maxFYDaiCost
     ) public {
         require(
@@ -59,7 +58,7 @@ contract RollProxy {
             "RollProxy: Only known pools"
         ); // Redundant, I think
 
-        bytes memory data = abi.encode(collateral, pool1, pool2, user, daiDebtToRepay, minDebtRepaid);
+        bytes memory data = abi.encode(collateral, pool1, pool2, user, daiDebtToRepay);
         // uint256 maxFYDaiCost = pool2.buyDaiPreview(daiDebtToRepay.toUint128()); // TODO: Done off-chain, as slippage protection
         pool2.fyDai().flashMint(maxFYDaiCost, data); // Callback from fyDai will come back to this contract
     }
@@ -71,8 +70,8 @@ contract RollProxy {
     )
         public
     {
-        (bytes32 collateral, IPool pool1, IPool pool2, address user, uint256 daiDebtToRepay, uint256 minDebtRepaid)
-            = abi.decode(data, (bytes32, IPool, IPool, address, uint256, uint256));
+        (bytes32 collateral, IPool pool1, IPool pool2, address user, uint256 daiDebtToRepay)
+            = abi.decode(data, (bytes32, IPool, IPool, address, uint256));
         require(
             knownPools[address(pool1)] && knownPools[address(pool2)],
             "RollProxy: Only known pools"
@@ -82,22 +81,41 @@ contract RollProxy {
             "RollProxy: Restricted to known lenders"
         ); // The msg.sender is the fyDai from one of the pools we know, and that we know only calls `executeOnFlashMint` in a strict loop. Therefore we can trust `data`.
 
-        pool2.buyDai(address(this), address(this), daiDebtToRepay.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
-        _sellAndRepay(collateral, pool1, user, daiDebtToRepay, minDebtRepaid);
-        uint256 fyDaiBalance = pool2.fyDai().balanceOf(address(this));
-        controller.borrow(
-            collateral,
-            pool2.fyDai().maturity(),
-            user,
-            address(this),
-            maxFYDaiCost > fyDaiBalance ? maxFYDaiCost - fyDaiBalance : 0 // TODO: Can this be abused?
-        );
+        uint256 daiToBuy = _daiCostToRepay(collateral, pool1, daiDebtToRepay);
+        pool2.buyDai(address(this), address(this), daiToBuy.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
+        _sellAndRepay(collateral, pool1, user, daiToBuy);
+        _borrowToTarget(collateral, pool2, user, maxFYDaiCost);
 
         // emit Event(); ?
     }
 
-    /// @dev Repay debt in Dai or in FYDai, depending on whether the fyDai has matured
-    function _sellAndRepay(bytes32 collateral, IPool pool, address user, uint256 amount, uint256 minDebtRepaid) private {
+    /// @dev Cost in Dai to repay a debt. Given that the debt is denominated in Dai at the time of maturity, this might be lower before then.
+    function _daiCostToRepay(bytes32 collateral, IPool pool, uint256 daiDebt) private view returns(uint256 daiCost) {
+        uint256 maturity = pool.fyDai().maturity();
+
+        if (block.timestamp >= maturity){
+            daiCost = daiDebt; // After maturity we pay using Dai, that the debt grows doesn't matter
+        } else {
+            daiCost = pool.buyFYDaiPreview(
+                controller.inFYDai(collateral, maturity, daiDebt).toUint128()
+            );
+        }        
+    }
+
+    /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool)
+    function _borrowToTarget(bytes32 collateral, IPool pool, address user, uint256 targetFYDai) private {
+        uint256 fyDaiBalance = pool.fyDai().balanceOf(address(this));
+        controller.borrow(
+            collateral,
+            pool.fyDai().maturity(),
+            user,
+            address(this),
+            targetFYDai > fyDaiBalance ? targetFYDai - fyDaiBalance : 0 // TODO: Can this be abused?
+        );
+    }
+
+    /// @dev Repay debt (denominated in Dai) either directly in Dai or in FYDai bought at a pool, depending on whether the fyDai has matured
+    function _sellAndRepay(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
         uint256 maturity = pool.fyDai().maturity();
 
         if (block.timestamp >= maturity){
@@ -106,14 +124,10 @@ contract RollProxy {
                 maturity,
                 address(this),
                 user,
-                amount
+                debtRepaid
             );
         } else {
-            uint256 fyDaiDebtToRepay = pool.sellDai(address(this), address(this), amount.toUint128());
-            require(
-                controller.inDai(collateral, maturity, fyDaiDebtToRepay) >= minDebtRepaid,
-                "RollProxy: Not enough debt repaid"
-            );
+            uint256 fyDaiDebtToRepay = pool.sellDai(address(this), address(this), debtRepaid.toUint128());
             controller.repayFYDai(
                 collateral,
                 maturity,
