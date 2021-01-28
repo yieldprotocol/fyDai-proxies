@@ -81,9 +81,9 @@ contract RollProxy {
             "RollProxy: Restricted to known lenders"
         ); // The msg.sender is the fyDai from one of the pools we know, and that we know only calls `executeOnFlashMint` in a strict loop. Therefore we can trust `data`.
 
-        uint256 daiToBuy = _daiCostToRepay(collateral, pool1, daiDebtToRepay);
+        uint256 daiToBuy = _daiCostToRepay(collateral, pool1, daiDebtToRepay); // This should be pre-calculated off-chain to save on gas
         pool2.buyDai(address(this), address(this), daiToBuy.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
-        _sellAndRepay(collateral, pool1, user, daiToBuy);
+        _bestRepay(collateral, pool1, user, daiToBuy);
         _borrowToTarget(collateral, pool2, user, maxFYDaiCost);
 
         // emit Event(); ?
@@ -115,7 +115,7 @@ contract RollProxy {
     }
 
     /// @dev Repay debt (denominated in Dai) either directly in Dai or in FYDai bought at a pool, depending on whether the fyDai has matured
-    function _sellAndRepay(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
+    function _bestRepay(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
         uint256 maturity = pool.fyDai().maturity();
 
         if (block.timestamp >= maturity){
