@@ -161,7 +161,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
       await dai.mint(user2, oneToken, { from: owner })
 
       const calldata = poolProxy.contract.methods
-        .addLiquidityWithSignature(pool0.address, daiUsed, maxFYDai, daiSig, controllerSig)
+        .addLiquidityWithSignature(pool0.address, daiUsed.toString(), maxFYDai.toString(), daiSig, controllerSig)
         .encodeABI()
       await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
         from: user2,
@@ -205,7 +205,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         const poolTokens = (await pool0.balanceOf(user2)).toString()
 
         const calldata = poolProxy.contract.methods
-          .removeLiquidityEarlyDaiPoolWithSignature(pool0.address, poolTokens, '0', '0', controllerSig, poolSig)
+          .removeLiquidityEarlyDaiPoolWithSignature(pool0.address, poolTokens.toString(), '0', '0', controllerSig, poolSig)
           .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
           from: user2,
@@ -216,7 +216,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         const poolTokens = (await pool0.balanceOf(user2)).toString()
 
         const calldata = poolProxy.contract.methods
-          .removeLiquidityEarlyDaiFixedWithSignature(pool0.address, poolTokens, '0', controllerSig, poolSig)
+          .removeLiquidityEarlyDaiFixedWithSignature(pool0.address, poolTokens.toString(), '0', controllerSig, poolSig)
           .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
           from: user2,
@@ -231,7 +231,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         const poolTokens = (await pool0.balanceOf(user2)).toString()
 
         const calldata = poolProxy.contract.methods
-          .removeLiquidityMatureWithSignature(pool0.address, poolTokens, controllerSig, poolSig)
+          .removeLiquidityMatureWithSignature(pool0.address, poolTokens.toString(), controllerSig, poolSig)
           .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
           from: user2,

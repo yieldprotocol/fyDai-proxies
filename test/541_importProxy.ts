@@ -284,7 +284,7 @@ contract('ImportProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importProxy.contract.methods
-      .importPosition(pool1.address, user, wethCollateral, daiDebt, toRay(2))
+      .importPosition(pool1.address, user, wethCollateral.toString(), daiDebt.toString(), toRay(2).toString())
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importProxy.address, calldata, {
       from: user,
@@ -327,7 +327,7 @@ contract('ImportProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importProxy.contract.methods
-      .importPositionWithSignature(pool1.address, user, wethCollateral, daiDebt, toRay(2), controllerSig)
+      .importPositionWithSignature(pool1.address, user, wethCollateral.toString(), daiDebt.toString(), toRay(2).toString(), controllerSig)
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importProxy.address, calldata, {
       from: user,
