@@ -104,6 +104,7 @@ contract('RollProxy', async (accounts) => {
 
   it('rolls debt before maturity', async () => {
     const debtToRoll = new BN(toWad(10).toString())
+    const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
     const maxFYDaiCost = new BN(toWad(100).toString())
     const daiDebtBefore = await controller.debtDai(WETH, maturity1, user1)
 
@@ -124,7 +125,7 @@ contract('RollProxy', async (accounts) => {
       pool1.address,
       pool2.address,
       user1,
-      debtToRoll,
+      daiToBuy,
       maxFYDaiCost,
       { from: user1 }
     )
@@ -152,6 +153,7 @@ contract('RollProxy', async (accounts) => {
     await fyDai1.mature()
 
     const debtToRoll = new BN(toWad(10).toString())
+    const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
     const maxFYDaiCost = new BN(toWad(100).toString())    
     const daiDebtBefore = await controller.debtDai(WETH, maturity1, user1)
 
@@ -172,7 +174,7 @@ contract('RollProxy', async (accounts) => {
       pool1.address,
       pool2.address,
       user1,
-      debtToRoll,
+      daiToBuy,
       maxFYDaiCost,
       { from: user1 }
     )

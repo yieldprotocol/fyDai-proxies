@@ -40,14 +40,27 @@ contract RollProxy {
         _dai.approve(address(_treasury), type(uint256).max);
     }
 
+    /// @dev Cost in Dai to repay a debt. Given that the debt is denominated in Dai at the time of maturity, this might be lower before then.
+    function daiCostToRepay(bytes32 collateral, IPool pool, uint256 daiDebt) public view returns(uint256 daiCost) {
+        uint256 maturity = pool.fyDai().maturity();
+
+        if (block.timestamp >= maturity){
+            daiCost = daiDebt; // After maturity we pay using Dai, that the debt grows doesn't matter
+        } else {
+            daiCost = pool.buyFYDaiPreview(
+                controller.inFYDai(collateral, maturity, daiDebt).toUint128()
+            );
+        }        
+    }
+
     /// @dev Roll debt from one maturity to another
     function rollDebt(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
         address user,
-        uint256 daiDebtToRepay,
-        uint256 maxFYDaiCost
+        uint256 daiToBuy,      // Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar
+        uint256 maxFYDaiCost   // Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage
     ) public {
         require(
             user == msg.sender || proxyRegistry.proxies(user) == msg.sender,
@@ -58,8 +71,7 @@ contract RollProxy {
             "RollProxy: Only known pools"
         ); // Redundant, I think
 
-        bytes memory data = abi.encode(collateral, pool1, pool2, user, daiDebtToRepay);
-        // uint256 maxFYDaiCost = pool2.buyDaiPreview(daiDebtToRepay.toUint128()); // TODO: Done off-chain, as slippage protection
+        bytes memory data = abi.encode(collateral, pool1, pool2, user, daiToBuy);
         pool2.fyDai().flashMint(maxFYDaiCost, data); // Callback from fyDai will come back to this contract
     }
 
@@ -70,7 +82,7 @@ contract RollProxy {
     )
         public
     {
-        (bytes32 collateral, IPool pool1, IPool pool2, address user, uint256 daiDebtToRepay)
+        (bytes32 collateral, IPool pool1, IPool pool2, address user, uint256 daiToBuy)
             = abi.decode(data, (bytes32, IPool, IPool, address, uint256));
         require(
             knownPools[address(pool1)] && knownPools[address(pool2)],
@@ -81,25 +93,11 @@ contract RollProxy {
             "RollProxy: Restricted to known lenders"
         ); // The msg.sender is the fyDai from one of the pools we know, and that we know only calls `executeOnFlashMint` in a strict loop. Therefore we can trust `data`.
 
-        uint256 daiToBuy = _daiCostToRepay(collateral, pool1, daiDebtToRepay); // This should be pre-calculated off-chain to save on gas
         pool2.buyDai(address(this), address(this), daiToBuy.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
         _bestRepay(collateral, pool1, user, daiToBuy);
         _borrowToTarget(collateral, pool2, user, maxFYDaiCost);
 
         // emit Event(); ?
-    }
-
-    /// @dev Cost in Dai to repay a debt. Given that the debt is denominated in Dai at the time of maturity, this might be lower before then.
-    function _daiCostToRepay(bytes32 collateral, IPool pool, uint256 daiDebt) private view returns(uint256 daiCost) {
-        uint256 maturity = pool.fyDai().maturity();
-
-        if (block.timestamp >= maturity){
-            daiCost = daiDebt; // After maturity we pay using Dai, that the debt grows doesn't matter
-        } else {
-            daiCost = pool.buyFYDaiPreview(
-                controller.inFYDai(collateral, maturity, daiDebt).toUint128()
-            );
-        }        
     }
 
     /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool)
