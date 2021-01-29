@@ -135,4 +135,30 @@ contract RollProxy {
             );
         }
     }
+
+    /// --------------------------------------------------
+    /// Signature method wrappers
+    /// --------------------------------------------------
+
+    /// @dev Determine whether all approvals and signatures are in place for `rollDebt`.
+    /// If `return` is `false`, `rollDebtWithSignature` must be called with a controller signature.
+    /// If `return` is `true`, `rollDebt` won't fail because of missing approvals or signatures.
+    function rollDebtCheck() public view returns (bool) {
+        return (controller.delegated(msg.sender, address(this)));
+    }
+
+    /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
+    function rollDebtWithSignature(
+        bytes32 collateral,
+        IPool pool1,
+        IPool pool2,
+        address user,
+        uint256 daiToBuy,      // Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar
+        uint256 maxFYDaiCost,  // Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage
+        bytes memory controllerSig
+    ) external {
+        if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
+        return rollDebt(collateral, pool1, pool2, user, daiToBuy, maxFYDaiCost);
+    }
+
 }

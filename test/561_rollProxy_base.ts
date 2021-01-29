@@ -4,10 +4,9 @@ const RollProxy = artifacts.require('RollProxy')
 
 // @ts-ignore
 import helper from 'ganache-time-traveler'
-import { WETH, spot, wethTokens1, toWad, toRay, mulRay, bnify, MAX } from './shared/utils'
+import { WETH, toWad, name, chainId, MAX } from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, YieldSpace, Contract } from './shared/fixtures'
-import { buyFYDai, sellFYDai, buyDai, sellDai } from './shared/yieldspace'
-const { floor } = require('mathjs')
+import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 
 async function currentTimestamp(): BN {
   const block = await web3.eth.getBlockNumber()
@@ -194,6 +193,38 @@ contract('RollProxy', async (accounts) => {
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
+  })
+
+  it('rolls debt with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const debtToRoll = new BN(toWad(10).toString())
+    const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
+    const maxFYDaiCost = new BN(toWad(100).toString())    
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollDebtWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      daiToBuy,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
   })
 
   it('Reverts if the cost in fyDai2 is too large', async () => {
