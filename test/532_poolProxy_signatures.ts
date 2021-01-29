@@ -1,7 +1,8 @@
 const Pool = artifacts.require('Pool')
 const PoolProxy = artifacts.require('PoolProxy')
 
-import { getSignatureDigest, getDaiDigest, user2PrivateKey, sign } from './shared/signatures'
+import { getSignatureDigest, getDaiDigest, getPermitDigest, user2PrivateKey, sign } from './shared/signatures'
+
 // @ts-ignore
 import helper from 'ganache-time-traveler'
 import {
@@ -18,9 +19,11 @@ import {
   functionSignature,
 } from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
+import { assert, expect } from 'chai'
+import { BN } from 'ethereumjs-util'
 
 contract('PoolProxy - Signatures', async (accounts) => {
-  let [owner, user1, user2, operator, to] = accounts
+  let [owner, user1, user2, user3, operator, to] = accounts
 
   const initialDai = daiTokens1
 
@@ -78,7 +81,7 @@ contract('PoolProxy - Signatures', async (accounts) => {
   })
 
   describe('without onboarding', () => {
-    let daiSig: any, controllerSig: any, poolSig: any
+    let daiSig: any, controllerSig: any, poolSig: any, daiPoolSig: any, fyDaiPoolSig: any
 
     beforeEach(async () => {
       // user1 sets the scene, user2 will interact without onboarding
@@ -147,6 +150,82 @@ contract('PoolProxy - Signatures', async (accounts) => {
         MAX
       )
       controllerSig = sign(controllerDigest, user2PrivateKey)
+
+      // Authorize the proxy for the pool0
+      const poolDigest = getSignatureDigest(
+        name,
+        pool0.address,
+        chainId,
+        {
+          user: user2,
+          delegate: proxy.address,
+        },
+        (await pool0.signatureCount(user2)).toString(),
+        MAX
+      )
+      poolSig = sign(poolDigest, user2PrivateKey)
+
+      // Authorize DAI for the pool0
+      const daiPoolDigest = getDaiDigest(
+        await dai.name(),
+        dai.address,
+        chainId,
+        {
+          owner: user2,
+          spender: pool0.address,
+          can: true,
+        },
+        bnify(await dai.nonces(user2)),
+        deadline
+      )
+      daiPoolSig = sign(daiPoolDigest, user2PrivateKey)
+
+
+      // Authorize fyDAI for the pool0
+      const fyDaiPoolDigest = getPermitDigest(
+        await fyDai0.name(),
+        fyDai0.address,
+        chainId,
+        {
+          owner: user2,
+          spender: pool0.address,
+          value: MAX,
+        },
+        bnify(await fyDai0.nonces(user2)),
+        deadline
+      )
+      fyDaiPoolSig = sign(fyDaiPoolDigest, user2PrivateKey)
+    })
+
+    it('checks missing approvals and signatures for adding liquidity', async () => {
+      let result = await proxy.addLiquidityCheck(pool0.address, { from: user3 })
+
+      assert.equal(result[0], false)
+      assert.equal(result[1], false)
+      assert.equal(result[2], false)
+
+      await dai.approve(proxy.address, MAX, { from: user3 })
+      result = await proxy.addLiquidityCheck(pool0.address, { from: user3 })
+      assert.equal(result[0], false)
+      assert.equal(result[1], true)
+      assert.equal(result[2], false)
+
+      await controller.addDelegate(proxy.address, { from: user3 })
+      result = await proxy.addLiquidityCheck(pool0.address, { from: user3 })
+      assert.equal(result[0], false)
+      assert.equal(result[1], true)
+      assert.equal(result[2], true)
+
+      const oneToken = toWad(1)
+      await dai.mint(user3, bnify(toWad(2)), { from: owner })
+      await proxy.addLiquidityWithSignature(pool0.address, oneToken, MAX, '0x', '0x', { from: user3 })
+
+      result = await proxy.addLiquidityCheck(pool0.address, { from: user3 })
+      assert.equal(result[0], true)
+      assert.equal(result[1], true)
+      assert.equal(result[2], true)
+
+      await proxy.addLiquidity(pool0.address, oneToken, MAX, { from: user3 })
     })
 
     it('adds liquidity', async () => {
@@ -178,6 +257,13 @@ contract('PoolProxy - Signatures', async (accounts) => {
       await proxy.addLiquidityWithSignature(pool0.address, daiUsed, maxFYDai, '0x', controllerSig, { from: user2 })
     })
 
+    it('mints liquidity tokens buying fyDai in the pool with off-chain signatures', async () => {
+      const oneToken = toWad(1)
+
+      await dai.mint(user2, oneToken.mul(100), { from: owner })
+      await proxy.buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig, { from: user2 })
+    })
+
     describe('with liquidity', () => {
       beforeEach(async () => {
         // Onboard for adding liquidity
@@ -207,6 +293,29 @@ contract('PoolProxy - Signatures', async (accounts) => {
           MAX
         )
         poolSig = sign(poolDigest, user2PrivateKey)
+      })
+
+      it('checks missing approvals and signatures for removing liquidity by selling', async () => {
+        await pool0.transfer(user3, await pool0.balanceOf(user3))
+
+        let result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], true)
+        assert.equal(result[1], false)
+        assert.equal(result[2], false)
+
+        await controller.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], false)
+
+        await pool0.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityEarlyDaiPoolCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+
+        await proxy.removeLiquidityEarlyDaiPool(pool0.address, await pool0.balanceOf(user3), 0, 0, { from: user3 }) // Check it doesn't revert.
       })
 
       it('removes liquidity early by selling with only the pool signature', async () => {
@@ -242,6 +351,43 @@ contract('PoolProxy - Signatures', async (accounts) => {
         })
       })
 
+      it('checks missing approvals and signatures for removing liquidity by repaying', async () => {
+        await pool0.transfer(user3, await pool0.balanceOf(user3))
+
+        let result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], false)
+        assert.equal(result[1], false)
+        assert.equal(result[2], false)
+
+        await controller.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], false)
+        assert.equal(result[1], true)
+        assert.equal(result[2], false)
+
+        await pool0.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], false)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+
+        const poolTokens = await pool0.balanceOf(user3)
+        await proxy.removeLiquidityEarlyDaiFixedWithSignature(
+          pool0.address,
+          poolTokens.div(bnify(2)),
+          '0',
+          '0x',
+          '0x',
+          { from: user3 }
+        )
+        result = await proxy.removeLiquidityEarlyDaiFixedCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+
+        await proxy.removeLiquidityEarlyDaiFixed(pool0.address, poolTokens.div(bnify(2)), '0', { from: user3 })
+      })
+
       it('removes liquidity early by repaying', async () => {
         const poolTokens = await pool0.balanceOf(user2)
 
@@ -249,6 +395,43 @@ contract('PoolProxy - Signatures', async (accounts) => {
         await proxy.removeLiquidityEarlyDaiFixedWithSignature(pool0.address, poolTokens, '0', controllerSig, poolSig, {
           from: user2,
         })
+      })
+
+      it('checks missing approvals and signatures for removing mature liquidity', async () => {
+        await helper.advanceTime(31556952)
+        await helper.advanceBlock()
+        await fyDai0.mature()
+
+        await pool0.transfer(user3, await pool0.balanceOf(user3))
+        let result = await proxy.removeLiquidityMatureCheck(pool0.address, { from: user3 })
+
+        assert.equal(result[0], false)
+        assert.equal(result[1], false)
+        assert.equal(result[2], false)
+
+        await controller.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityMatureCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], false)
+        assert.equal(result[1], true)
+        assert.equal(result[2], false)
+
+        await pool0.addDelegate(proxy.address, { from: user3 })
+        result = await proxy.removeLiquidityMatureCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], false)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+
+        const poolTokens = await pool0.balanceOf(user3)
+        await proxy.removeLiquidityMatureWithSignature(pool0.address, poolTokens.div(bnify(2)), '0x', '0x', {
+          from: user3,
+        })
+
+        result = await proxy.removeLiquidityMatureCheck(pool0.address, { from: user3 })
+        assert.equal(result[0], true)
+        assert.equal(result[1], true)
+        assert.equal(result[2], true)
+
+        await proxy.removeLiquidityMature(pool0.address, poolTokens.div(bnify(2)), { from: user3 })
       })
 
       it('removes liquidity after maturity by redeeming', async () => {

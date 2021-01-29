@@ -33,6 +33,7 @@
     "hardhat": "^2.0.8",
     "hardhat-deploy": "^0.7.0-beta.44",
     "hardhat-gas-reporter": "^1.0.3",
+    "mathjs": "^7.3.0",
     "mocha": "^7.1.0",
     "prettier": "^2.0.5",
     "solhint": "^3.2.0",

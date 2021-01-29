@@ -67,6 +67,33 @@ contract PoolProxy is DecimalMath {
         return pool.mint(address(this), msg.sender, daiToAdd);
     }
 
+    /// @dev Mints liquidity with provided Dai by buying fyDai with some of the Dai.
+    /// Caller must have approved the proxy using`pool.addDelegate(poolProxy)` or with `buyAddLiquidityWithSignature`.
+    /// Caller must have approved the dai transfer with `dai.approve(maxDaiUsed)` or with `buyAddLiquidityWithSignature`.
+    /// @param fyDaiBought amount of fyDai being bought to use to mint liquidity.
+    /// @param maxDaiUsed maximum amount of Dai to be used for adding liquidity. 
+    /// @return The amount of liquidity tokens minted.  
+    function buyAddLiquidity(IPool pool, uint256 fyDaiBought, uint256 maxDaiUsed) public returns (uint256) {
+        IFYDai fyDai = pool.fyDai();
+        require(fyDai.isMature() != true, "PoolProxy: Only before maturity");
+        uint256 daiSold = pool.buyFYDai(msg.sender, msg.sender, fyDaiBought.toUint128());
+
+        // This way we know we have bought enough fyDai, and there is none left of it, only Dai
+        uint256 supply = pool.totalSupply();
+        uint256 daiReserves = dai.balanceOf(address(pool));
+        uint256 fyDaiReserves = fyDai.balanceOf(address(pool));
+        uint256 tokensMinted = supply.mul(fyDaiBought).div(fyDaiReserves);
+        uint256 daiUsed = daiReserves.mul(tokensMinted).div(supply);
+
+        require(
+            maxDaiUsed >= daiSold.add(daiUsed),
+            "PoolProxy: Limit exceeded"
+        );
+
+        return pool.mint(msg.sender, msg.sender, daiUsed);
+    }
+
+
     /// @dev Burns tokens and sells Dai proceedings for fyDai. Pays as much debt as possible, then sells back any remaining fyDai for Dai. Then returns all Dai, and if there is no debt in the Controller, all posted Chai.
     /// Caller must have approved the proxy using`controller.addDelegate(poolProxy)` and `pool.addDelegate(poolProxy)` or with `removeLiquidityEarlyDaiPoolWithSignature`
     /// Caller must have called `removeLiquidityEarlyDaiPoolWithSignature` at least once before to set proxy approvals.
@@ -200,8 +227,6 @@ contract PoolProxy is DecimalMath {
     }
 
     /// @dev Mints liquidity with provided Dai by borrowing fyDai with some of the Dai.
-    /// Caller must have approved the proxy using`controller.addDelegate(poolProxy)`
-    /// Caller must have approved the dai transfer with `dai.approve(daiUsed)`
     /// @param daiUsed amount of Dai to use to mint liquidity. 
     /// @param maxFYDai maximum amount of fyDai to be borrowed to mint liquidity.
     /// @param daiSig packed signature for permit of dai transfers to this proxy. Ignored if '0x'.
@@ -218,6 +243,41 @@ contract PoolProxy is DecimalMath {
         if (daiSig.length > 0) dai.permitPackedDai(address(this), daiSig);
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
         return addLiquidity(pool, daiUsed, maxFYDai);
+    }
+
+    /// @dev Determine whether all approvals and signatures are in place for `buyAddLiquidity`.
+    /// If `return[0]` is `false`, calling `addLiquidityWithSignature` will set the proxy approvals.
+    /// If `return[1]` is `false`, `buyAddLiquidityWithSignature` must be called with a dai permit signature for the pool.
+    /// If `return[2]` is `false`, `buyAddLiquidityWithSignature` must be called with a fyDai permit signature for the pool.
+    /// If `return[3]` is `false`, `buyAddLiquidityWithSignature` must be called with a delegation signature for the pool.
+    /// If `return` is `(true, true, true, true)`, `buyAddLiquidity` won't fail because of missing approvals or signatures.
+    function buyAddLiquidityCheck(IPool pool) public view returns (bool, bool, bool, bool) {
+        bool approvals = true;
+        bool daiSig = dai.allowance(msg.sender, address(pool)) == type(uint256).max;
+        bool fyDaiSig = pool.fyDai().allowance(msg.sender, address(pool)) >= type(uint112).max;
+        bool poolSig = pool.delegated(msg.sender, address(this));
+        return (approvals, daiSig, fyDaiSig, poolSig);
+    }
+
+    /// @dev Mints liquidity with provided Dai by buying fyDai with some of the Dai.
+    /// @param fyDaiBought amount of fyDai being bought to use to mint liquidity.
+    /// @param maxDaiUsed maximum amount of Dai to be used for adding liquidity. 
+    /// @param daiSig packed signature for permit of dai transfers to the pool. Ignored if '0x'.
+    /// @param fyDaiSig packed signature for permit of fyDai transfers to the pool. Ignored if '0x'.
+    /// @param poolSig packed signature for delegation of this proxy in the pool. Ignored if '0x'.
+    /// @return The amount of liquidity tokens minted.  
+    function buyAddLiquidityWithSignature(
+        IPool pool,
+        uint256 fyDaiBought,
+        uint256 maxDaiUsed,
+        bytes memory daiSig,
+        bytes memory fyDaiSig,
+        bytes memory poolSig
+    ) external returns (uint256) {
+        if (daiSig.length > 0) dai.permitPackedDai(address(pool), daiSig);
+        if (fyDaiSig.length > 0) pool.fyDai().permitPacked(address(pool), fyDaiSig);
+        if (poolSig.length > 0) pool.addDelegatePacked(poolSig);
+        return buyAddLiquidity(pool, fyDaiBought, maxDaiUsed);
     }
 
     /// @dev Determine whether all approvals and signatures are in place for `removeLiquidityEarlyDaiPool`.
