@@ -8,7 +8,7 @@ import "./interfaces/IProxyRegistry.sol";
 import "./helpers/SafeCast.sol";
 import "./helpers/YieldAuth.sol";
 
-
+/// @dev RollProxy migrates debt positions between two maturities of the v1 Yield Protocol.
 contract RollProxy {
     using SafeCast for uint256;
     using YieldAuth for IController;
@@ -41,6 +41,9 @@ contract RollProxy {
     }
 
     /// @dev Cost in Dai to repay a debt. Given that the debt is denominated in Dai at the time of maturity, this might be lower before then.
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool The pool trading the maturity in which the debt is denominated.
+    /// @param daiDebt The amount of Dai debt to query the Dai repayment cost, also in Dai.
     function daiCostToRepay(bytes32 collateral, IPool pool, uint256 daiDebt) public view returns(uint256 daiCost) {
         uint256 maturity = pool.fyDai().maturity();
 
@@ -54,18 +57,24 @@ contract RollProxy {
     }
 
     /// @dev Roll debt from one maturity to another
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool1 The pool trading the maturity in which the debt is denominated.
+    /// @param pool2 The pool trading the maturity in which the debt is being rolled to.
+    /// @param user The user owning the Yield Protocol v1 debt vault.
+    /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
+    /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
     function rollDebt(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
         address user,
-        uint256 daiToBuy,      // Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar
-        uint256 maxFYDaiCost   // Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage
+        uint256 daiToBuy,
+        uint256 maxFYDaiCost
     ) public {
         require(
             user == msg.sender || proxyRegistry.proxies(user) == msg.sender,
             "RollProxy: Restricted to user or its dsproxy"
-        ); // Redundant, I think
+        );
         require(
             knownPools[address(pool1)] && knownPools[address(pool2)],
             "RollProxy: Only known pools"
@@ -76,6 +85,8 @@ contract RollProxy {
     }
 
     /// @dev Flash loan callback, contains most of the logic
+    /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. 
+    /// @param data Packed parameter with all the other parameters from `rollDebt`.
     function executeOnFlashMint(
         uint256 maxFYDaiCost,
         bytes memory data
@@ -100,7 +111,11 @@ contract RollProxy {
         // emit Event(); ?
     }
 
-    /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool)
+    /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool).
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool The pool trading the maturity in which the debt is denominated.
+    /// @param user The user owning the Yield Protocol v1 debt vault.
+    /// @param targetFYDai The amount of fyDai that the proxy should hold after executing this function, at a minimum.
     function _borrowToTarget(bytes32 collateral, IPool pool, address user, uint256 targetFYDai) private {
         uint256 fyDaiBalance = pool.fyDai().balanceOf(address(this));
         controller.borrow(
@@ -113,6 +128,10 @@ contract RollProxy {
     }
 
     /// @dev Repay debt (denominated in Dai) either directly in Dai or in FYDai bought at a pool, depending on whether the fyDai has matured
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool The pool trading the maturity in which the debt is denominated.
+    /// @param user The user owning the Yield Protocol v1 debt vault.
+    /// @param debtRepaid The amount of Dai debt that should be repaid, with holdings from this proxy.
     function _bestRepay(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
         uint256 maturity = pool.fyDai().maturity();
 
@@ -147,6 +166,13 @@ contract RollProxy {
         return (controller.delegated(msg.sender, address(this)));
     }
 
+    /// @dev Roll debt from one maturity to another.
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool1 The pool trading the maturity in which the debt is denominated.
+    /// @param pool2 The pool trading the maturity in which the debt is being rolled to.
+    /// @param user The user owning the Yield Protocol v1 debt vault.
+    /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
+    /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
     function rollDebtWithSignature(
         bytes32 collateral,
