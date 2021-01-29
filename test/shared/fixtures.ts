@@ -163,7 +163,10 @@ export class YieldEnvironmentLite {
     await treasury.batchOrchestrate(controller.address, treasuryFunctions)
 
     for (const fyDai of fyDais) {
-      await fyDai.batchOrchestrate(controller.address, [functionSignature('mint(address,uint256)'), functionSignature('burn(address,uint256)')])
+      await fyDai.batchOrchestrate(controller.address, [
+        functionSignature('mint(address,uint256)'),
+        functionSignature('burn(address,uint256)'),
+      ])
     }
 
     return controller

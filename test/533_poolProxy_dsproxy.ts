@@ -7,7 +7,19 @@ const DSProxyRegistry = artifacts.require('ProxyRegistry')
 import { getSignatureDigest, getDaiDigest, user2PrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import helper from 'ganache-time-traveler'
-import { CHAI, chi1, rate1, daiTokens1, toWad, precision, bnify, chainId, name, MAX, functionSignature } from './shared/utils'
+import {
+  CHAI,
+  chi1,
+  rate1,
+  daiTokens1,
+  toWad,
+  precision,
+  bnify,
+  chainId,
+  name,
+  MAX,
+  functionSignature,
+} from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 contract('PoolProxy - DSProxy', async (accounts) => {
@@ -205,7 +217,14 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         const poolTokens = (await pool0.balanceOf(user2)).toString()
 
         const calldata = poolProxy.contract.methods
-          .removeLiquidityEarlyDaiPoolWithSignature(pool0.address, poolTokens.toString(), '0', '0', controllerSig, poolSig)
+          .removeLiquidityEarlyDaiPoolWithSignature(
+            pool0.address,
+            poolTokens.toString(),
+            '0',
+            '0',
+            controllerSig,
+            poolSig
+          )
           .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
           from: user2,

@@ -8,7 +8,19 @@ const DSProxyRegistry = artifacts.require('ProxyRegistry')
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO, functionSignature } from './shared/utils'
+import {
+  WETH,
+  rate1,
+  daiTokens1,
+  mulRay,
+  toRay,
+  name,
+  chainId,
+  bnify,
+  MAX,
+  ZERO,
+  functionSignature,
+} from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -101,14 +113,8 @@ contract('ImportProxy', async (accounts) => {
   })
 
   it('does not allow to execute the flash mint with unknown pools', async () => {
-    const data = web3.eth.abi.encodeParameters(
-      ['address', 'address', 'uint256', 'uint256'],
-      [user, user, 1, 0]
-    )
-    await expectRevert(
-      importProxy.executeOnFlashMint(1, data, { from: user }),
-      'ImportProxy: Only known pools'
-    )
+    const data = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256'], [user, user, 1, 0])
+    await expectRevert(importProxy.executeOnFlashMint(1, data, { from: user }), 'ImportProxy: Only known pools')
   })
 
   it('does not allow to execute the flash mint callback to users', async () => {
@@ -147,7 +153,9 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), toRay(2), { from: user }),
+      importProxy.importFromProxy(pool1.address, user, wethCollateral, bnify(daiDebt).mul(10), toRay(2), {
+        from: user,
+      }),
       'ImportProxy: Not enough debt in Maker'
     )
   })
@@ -168,7 +176,9 @@ contract('ImportProxy', async (accounts) => {
     const wethCollateral = bnify((await vat.urns(WETH, importProxy.address)).ink).toString()
 
     await expectRevert(
-      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, toRay(2), { from: user }),
+      importProxy.importFromProxy(pool1.address, user, bnify(wethCollateral).mul(10), daiDebt, toRay(2), {
+        from: user,
+      }),
       'ImportProxy: Not enough collateral in Maker'
     )
   })
@@ -327,7 +337,14 @@ contract('ImportProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importProxy.contract.methods
-      .importPositionWithSignature(pool1.address, user, wethCollateral.toString(), daiDebt.toString(), toRay(2).toString(), controllerSig)
+      .importPositionWithSignature(
+        pool1.address,
+        user,
+        wethCollateral.toString(),
+        daiDebt.toString(),
+        toRay(2).toString(),
+        controllerSig
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importProxy.address, calldata, {
       from: user,

@@ -4,7 +4,19 @@ const PoolProxy = artifacts.require('PoolProxy')
 import { getSignatureDigest, getDaiDigest, user2PrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import helper from 'ganache-time-traveler'
-import { CHAI, chi1, rate1, daiTokens1, toWad, precision, bnify, chainId, name, MAX, functionSignature } from './shared/utils'
+import {
+  CHAI,
+  chi1,
+  rate1,
+  daiTokens1,
+  toWad,
+  precision,
+  bnify,
+  chainId,
+  name,
+  MAX,
+  functionSignature,
+} from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 contract('PoolProxy - Signatures', async (accounts) => {

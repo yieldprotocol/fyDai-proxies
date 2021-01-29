@@ -4,7 +4,19 @@ const ExportProxy = artifacts.require('ExportProxy')
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, wethTokens1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, functionSignature } from './shared/utils'
+import {
+  WETH,
+  rate1,
+  wethTokens1,
+  daiTokens1,
+  mulRay,
+  toRay,
+  name,
+  chainId,
+  bnify,
+  MAX,
+  functionSignature,
+} from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -147,6 +159,8 @@ contract('ExportProxy', async (accounts) => {
     const controllerSig = sign(controllerDigest, userPrivateKey)
     await vat.hope(exportProxy.address, { from: user }) // Allowing ExportProxy to manipulate debt for user in MakerDAO
 
-    await exportProxy.exportPositionWithSignature(pool1.address, wethTokens1, toBorrow, toRay(1), controllerSig, { from: user })
+    await exportProxy.exportPositionWithSignature(pool1.address, wethTokens1, toBorrow, toRay(1), controllerSig, {
+      from: user,
+    })
   })
 })

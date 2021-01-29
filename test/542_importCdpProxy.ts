@@ -8,7 +8,19 @@ const DssCdpManager = artifacts.require('DssCdpManager')
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX, ZERO, functionSignature } from './shared/utils'
+import {
+  WETH,
+  rate1,
+  daiTokens1,
+  mulRay,
+  toRay,
+  name,
+  chainId,
+  bnify,
+  MAX,
+  ZERO,
+  functionSignature,
+} from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -106,10 +118,7 @@ contract('ImportCdpProxy', async (accounts) => {
       ['address', 'address', 'uint256', 'uint256', 'uint256'],
       [user, user, 1, 1, 0]
     )
-    await expectRevert(
-      importCdpProxy.executeOnFlashMint(1, data, { from: user }),
-      'ImportCdpProxy: Only known pools'
-    )
+    await expectRevert(importCdpProxy.executeOnFlashMint(1, data, { from: user }), 'ImportCdpProxy: Only known pools')
   })
 
   it('does not allow to execute the flash mint callback to users', async () => {
@@ -131,7 +140,6 @@ contract('ImportCdpProxy', async (accounts) => {
       'ImportCdpProxy: Only known pools'
     )
   })
-
 
   it('does not allow to move more debt than existing in maker', async () => {
     // Give CDP to static ImportCdpProxy
@@ -256,7 +264,13 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPosition(pool1.address, cdp.toString(), wethCollateral.toString(), daiDebt.toString(), toRay(2).toString())
+      .importCdpPosition(
+        pool1.address,
+        cdp.toString(),
+        wethCollateral.toString(),
+        daiDebt.toString(),
+        toRay(2).toString()
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -291,7 +305,13 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPosition(pool1.address, cdp.toString(), wethCollateral.toString(), daiDebt.toString(), toRay(2).toString())
+      .importCdpPosition(
+        pool1.address,
+        cdp.toString(),
+        wethCollateral.toString(),
+        daiDebt.toString(),
+        toRay(2).toString()
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -328,7 +348,13 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPosition(pool1.address, cdp.toString(), wethToMove.toString(), debtToMove.toString(), toRay(2).toString())
+      .importCdpPosition(
+        pool1.address,
+        cdp.toString(),
+        wethToMove.toString(),
+        debtToMove.toString(),
+        toRay(2).toString()
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -370,7 +396,14 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPositionWithSignature(pool1.address, cdp.toString(), wethCollateral.toString(), daiDebt.toString(), toRay(2).toString(), controllerSig)
+      .importCdpPositionWithSignature(
+        pool1.address,
+        cdp.toString(),
+        wethCollateral.toString(),
+        daiDebt.toString(),
+        toRay(2).toString(),
+        controllerSig
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
@@ -402,7 +435,14 @@ contract('ImportCdpProxy', async (accounts) => {
 
     // Go!!!
     const calldata = importCdpProxy.contract.methods
-      .importCdpPositionWithSignature(pool1.address, cdp.toString(), wethCollateral.toString(), daiDebt.toString(), toRay(2).toString(), controllerSig)
+      .importCdpPositionWithSignature(
+        pool1.address,
+        cdp.toString(),
+        wethCollateral.toString(),
+        daiDebt.toString(),
+        toRay(2).toString(),
+        controllerSig
+      )
       .encodeABI()
     await dsProxy.methods['execute(address,bytes)'](importCdpProxy.address, calldata, {
       from: user,
