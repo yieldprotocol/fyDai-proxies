@@ -2,11 +2,22 @@ const Pool = artifacts.require('Pool')
 const PoolProxy = artifacts.require('PoolProxy')
 
 import { getSignatureDigest, getDaiDigest, getPermitDigest, user2PrivateKey, sign } from './shared/signatures'
-import { fyDaiForMint } from './shared/fyDaiForMint'
-import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
+
 // @ts-ignore
 import helper from 'ganache-time-traveler'
-import { CHAI, chi1, rate1, daiTokens1, toWad, precision, bnify, chainId, name, MAX } from './shared/utils'
+import {
+  CHAI,
+  chi1,
+  rate1,
+  daiTokens1,
+  toWad,
+  precision,
+  bnify,
+  chainId,
+  name,
+  MAX,
+  functionSignature,
+} from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
 import { assert, expect } from 'chai'
 import { BN } from 'ethereumjs-util'
@@ -58,8 +69,8 @@ contract('PoolProxy - Signatures', async (accounts) => {
     pool1 = await Pool.new(dai.address, fyDai1.address, 'Name', 'Symbol', { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai0.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
-    await fyDai1.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
+    await fyDai0.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
 
     // Setup PoolProxy
     proxy = await PoolProxy.new(controller.address)

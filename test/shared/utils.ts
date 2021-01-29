@@ -1,7 +1,7 @@
 // @ts-ignore
 import { BN } from '@openzeppelin/test-helpers'
 import { BigNumber, BigNumberish } from 'ethers'
-import { formatBytes32String } from 'ethers/lib/utils'
+import { formatBytes32String, keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 import { expect } from 'chai'
 
 export const ZERO = new BN('0').toString()
@@ -82,6 +82,10 @@ export function divrupRay(x: BigNumberish, ray: BigNumberish): BigNumber {
   const z = UNIT.mul(BigNumber.from(x)).div(BigNumber.from(ray))
   if (z.mul(ray).div(UNIT) < x) return z.add('1')
   return z
+}
+
+export function functionSignature(signature: string) {
+  return keccak256(toUtf8Bytes(signature)).slice(0, 10)
 }
 
 export const CHAI = formatBytes32String('CHAI')

@@ -1,10 +1,9 @@
 const Pool = artifacts.require('Pool')
 const BorrowProxy = artifacts.require('BorrowProxy')
 
-import { WETH, wethTokens1, toWad, toRay, mulRay, bnify, chainId, name, MAX } from './shared/utils'
+import { WETH, wethTokens1, toWad, toRay, mulRay, bnify, chainId, name, MAX, functionSignature } from './shared/utils'
 import { getSignatureDigest, getDaiDigest, getPermitDigest, userPrivateKey, sign } from './shared/signatures'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
-import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 
 // @ts-ignore
 import { expectRevert } from '@openzeppelin/test-helpers'
@@ -50,7 +49,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
     borrowProxy = await BorrowProxy.new(controller.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai1.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
   })
 
   describe('collateral', () => {
@@ -76,6 +75,7 @@ contract('BorrowProxy - Signatures', async (accounts) => {
       })
 
       it('allows user to withdraw weth', async () => {
+        console.log(controllerSig)
         await borrowProxy.withdrawWithSignature(user2, wethTokens1, controllerSig, { from: user1 })
       })
 
@@ -233,8 +233,8 @@ contract('BorrowProxy - Signatures', async (accounts) => {
       const daiReserves = daiTokens1
       await env.maker.getDai(owner, daiReserves, rate1)
 
-      await fyDai1.approve(pool.address, -1, { from: owner })
-      await dai.approve(pool.address, -1, { from: owner })
+      await fyDai1.approve(pool.address, MAX, { from: owner })
+      await dai.approve(pool.address, MAX, { from: owner })
       await pool.mint(owner, owner, daiReserves, { from: owner })
 
       const fyDaiDigest = getPermitDigest(

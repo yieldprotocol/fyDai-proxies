@@ -1,7 +1,6 @@
 const Pool = artifacts.require('Pool')
 const PoolProxy = artifacts.require('PoolProxy')
 
-import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 // @ts-ignore
 import helper from 'ganache-time-traveler'
 import {
@@ -18,6 +17,7 @@ import {
   bnify,
   ZERO,
   MAX,
+  functionSignature,
 } from './shared/utils'
 import { fyDaiForMint } from './shared/fyDaiForMint'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
@@ -105,9 +105,9 @@ contract('PoolProxy', async (accounts) => {
     pool2 = await Pool.new(dai.address, fyDai2.address, 'Name', 'Symbol', { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai0.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
-    await fyDai1.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
-    await fyDai2.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
+    await fyDai0.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
+    await fyDai2.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
 
     // Setup PoolProxy
     proxy = await PoolProxy.new(controller.address)

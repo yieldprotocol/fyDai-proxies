@@ -1,11 +1,22 @@
 const Pool = artifacts.require('Pool')
 const ExportProxy = artifacts.require('ExportProxy')
 
-import { id } from 'ethers/lib/utils'
 import { getSignatureDigest, userPrivateKey, sign } from './shared/signatures'
 // @ts-ignore
 import { BN, expectRevert } from '@openzeppelin/test-helpers'
-import { WETH, rate1, wethTokens1, daiTokens1, mulRay, toRay, name, chainId, bnify, MAX } from './shared/utils'
+import {
+  WETH,
+  rate1,
+  wethTokens1,
+  daiTokens1,
+  mulRay,
+  toRay,
+  name,
+  chainId,
+  bnify,
+  MAX,
+  functionSignature,
+} from './shared/utils'
 import { YieldEnvironmentLite, Contract } from './shared/fixtures'
 
 import { assert, expect } from 'chai'
@@ -43,7 +54,7 @@ contract('ExportProxy', async (accounts) => {
     exportProxy = await ExportProxy.new(controller.address, [pool1.address], { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai1.orchestrate(owner, id('mint(address,uint256)'), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
 
     // Initialize Pool1
     const daiReserves = bnify(daiTokens1).mul(5)
