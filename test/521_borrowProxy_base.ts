@@ -1,9 +1,8 @@
 const Pool = artifacts.require('Pool')
 const BorrowProxy = artifacts.require('BorrowProxy')
 
-import { WETH, spot, wethTokens1, toWad, toRay, mulRay, bnify, MAX } from './shared/utils'
+import { WETH, spot, wethTokens1, toWad, toRay, mulRay, bnify, MAX, functionSignature } from './shared/utils'
 import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtures'
-import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 
 // @ts-ignore
 import { balance, BN, expectRevert } from '@openzeppelin/test-helpers'
@@ -51,7 +50,7 @@ contract('BorrowProxy', async (accounts) => {
     proxy = await BorrowProxy.new(controller.address, { from: owner })
 
     // Allow owner to mint fyDai the sneaky way, without recording a debt in controller
-    await fyDai1.orchestrate(owner, keccak256(toUtf8Bytes('mint(address,uint256)')), { from: owner })
+    await fyDai1.orchestrate(owner, functionSignature('mint(address,uint256)'), { from: owner })
   })
 
   describe('collateral', () => {
@@ -372,12 +371,12 @@ contract('BorrowProxy', async (accounts) => {
       const daiReserves = daiTokens1
       await env.maker.getDai(owner, daiReserves, rate1)
 
-      await fyDai1.approve(pool.address, -1, { from: owner })
-      await dai.approve(pool.address, -1, { from: owner })
+      await fyDai1.approve(pool.address, MAX, { from: owner })
+      await dai.approve(pool.address, MAX, { from: owner })
       await pool.mint(owner, owner, daiReserves, { from: owner })
 
-      await fyDai1.approve(pool.address, -1, { from: user1 })
-      await dai.approve(pool.address, -1, { from: user1 })
+      await fyDai1.approve(pool.address, MAX, { from: user1 })
+      await dai.approve(pool.address, MAX, { from: user1 })
       await pool.addDelegate(proxy.address, { from: user1 })
     })
 

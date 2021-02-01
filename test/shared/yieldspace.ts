@@ -87,6 +87,8 @@ export function sellDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTill
   const y = subtract(Y, pow(sum, invA))
   const yFee = subtract(y, fee)
 
+  if (divide(y, x) < bignumber(1)) throw new RangeError()
+
   return yFee
 }
 
@@ -109,6 +111,8 @@ export function sellFYDai(daiReserves: any, fyDaiReserves: any, fyDai: any, time
   const y = subtract(Z, pow(sum, invA))
   const yFee = subtract(y, fee)
 
+  if (divide(y, x) > bignumber(1)) throw new RangeError()
+
   return yFee
 }
 
@@ -129,6 +133,9 @@ export function buyDai(daiReserves: any, fyDaiReserves: any, dai: any, timeTillM
   const Zxa = pow(subtract(Z, x), a)
   const sum = subtract(add(Za, Ya), Zxa)
   const y = subtract(pow(sum, invA), Y)
+
+  if (divide(y, x) < bignumber(1)) throw new RangeError()
+
   const yFee = add(y, fee)
 
   return yFee
@@ -152,6 +159,8 @@ export function buyFYDai(daiReserves: any, fyDaiReserves: any, fyDai: any, timeT
   const sum = add(Za, subtract(Ya, Yxa))
   const y = subtract(pow(sum, invA), Z)
   const yFee = add(y, fee)
+
+  if (divide(y, x) > bignumber(1)) throw new RangeError()
 
   return yFee
 }
