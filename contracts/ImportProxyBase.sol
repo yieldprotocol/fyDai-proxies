@@ -7,13 +7,10 @@ import "./interfaces/IWeth.sol";
 import "./interfaces/IGemJoin.sol";
 import "./interfaces/IDaiJoin.sol";
 import "./interfaces/IVat.sol";
+import "./interfaces/IProxyRegistry.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IFYDai.sol";
 
-
-interface IProxyRegistry {
-    function proxies(address) external view returns (address);
-}
 
 contract ImportProxyBase {
 

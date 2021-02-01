@@ -243,16 +243,6 @@ contract('PoolProxy - Signatures', async (accounts) => {
       const daiUsed = bnify(oneToken)
 
       await dai.mint(user2, oneToken, { from: owner })
-      await controller.addDelegate(proxy.address, { from: user2 })
-      await proxy.addLiquidityWithSignature(pool0.address, daiUsed, maxFYDai, daiSig, '0x', { from: user2 })
-    })
-
-    it('adds liquidity using only one signature', async () => {
-      const oneToken = toWad(1)
-      const maxFYDai = oneToken
-      const daiUsed = bnify(oneToken)
-
-      await dai.mint(user2, oneToken, { from: owner })
       await dai.approve(proxy.address, MAX, { from: user2 })
       await proxy.addLiquidityWithSignature(pool0.address, daiUsed, maxFYDai, '0x', controllerSig, { from: user2 })
     })
