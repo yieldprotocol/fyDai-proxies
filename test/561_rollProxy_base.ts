@@ -119,7 +119,7 @@ contract('RollProxy', async (accounts) => {
 
     // Then borrow fyDai2Used to make the flash loan whole
 
-    await rollProxy.rollDebt(
+    await rollProxy.rollDebtBeforeMaturity(
       WETH,
       pool1.address,
       pool2.address,
@@ -168,7 +168,7 @@ contract('RollProxy', async (accounts) => {
 
     // Then borrow fyDai2Used to make the flash loan whole
 
-    await rollProxy.rollDebt(
+    await rollProxy.rollDebtAfterMaturity(
       WETH,
       pool1.address,
       pool2.address,
@@ -215,7 +215,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollDebtWithSignature(
+    await rollProxy.rollDebtBeforeMaturityWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -231,7 +231,7 @@ contract('RollProxy', async (accounts) => {
     const debtToRoll = new BN(toWad(10).toString())
 
     await expectRevert(
-      rollProxy.rollDebt(
+      rollProxy.rollDebtBeforeMaturity(
         WETH,
         pool1.address,
         pool2.address,
