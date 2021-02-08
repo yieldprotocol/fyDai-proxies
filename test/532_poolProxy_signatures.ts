@@ -180,7 +180,6 @@ contract('PoolProxy - Signatures', async (accounts) => {
       )
       daiPoolSig = sign(daiPoolDigest, user2PrivateKey)
 
-
       // Authorize fyDAI for the pool0
       const fyDaiPoolDigest = getPermitDigest(
         await fyDai0.name(),
@@ -251,7 +250,9 @@ contract('PoolProxy - Signatures', async (accounts) => {
       const oneToken = toWad(1)
 
       await dai.mint(user2, oneToken.mul(100), { from: owner })
-      await proxy.buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig, { from: user2 })
+      await proxy.buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig, {
+        from: user2,
+      })
     })
 
     describe('with liquidity', () => {

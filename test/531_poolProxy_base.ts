@@ -276,7 +276,7 @@ contract('PoolProxy', async (accounts) => {
     ).toString()
     await expectRevert(
       proxy.buyAddLiquidityWithSignature(pool0.address, fyDaiIn, maxDaiUsed.divn(2), '0x', '0x', '0x', { from: user2 }),
-      "PoolProxy: Limit exceeded"
+      'PoolProxy: Limit exceeded'
     )
   })
 
