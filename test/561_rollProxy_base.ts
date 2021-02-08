@@ -122,7 +122,7 @@ contract('RollProxy', async (accounts) => {
       daiDebtBefore.sub(debtToRoll),
       debtToRoll.divn(100000)
     )
-    // At least, make sure the proxy keeps nothing
+    // Make sure the proxy keeps nothing
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
@@ -172,7 +172,7 @@ contract('RollProxy', async (accounts) => {
       debtToRoll.divn(100000)
     )
 
-    // At least, make sure the proxy keeps nothing
+    // Make sure the proxy keeps nothing
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
@@ -198,7 +198,7 @@ contract('RollProxy', async (accounts) => {
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
   })
 
-  it('rolls debt with signature', async () => {
+  it('rolls some debt before maturity with signature', async () => {
     await controller.revokeDelegate(rollProxy.address, { from: user1 })
     const debtToRoll = new BN(toWad(10).toString())
     const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
@@ -224,6 +224,96 @@ contract('RollProxy', async (accounts) => {
       pool2.address,
       user1,
       daiToBuy,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
+  it('rolls all debt before maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const maxFYDaiCost = new BN(toWad(2000).toString())    
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollAllBeforeMaturityWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
+  it('rolls some debt after maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const debtToRoll = new BN(toWad(10).toString())
+    const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
+    const maxFYDaiCost = new BN(toWad(100).toString())    
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollDebtAfterMaturityWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      daiToBuy,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
+  it('rolls all debt after maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const maxFYDaiCost = new BN(toWad(2000).toString())    
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollAllAfterMaturityWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
       maxFYDaiCost,
       controllerSig,
       { from: user1 }
