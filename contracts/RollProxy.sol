@@ -13,6 +13,8 @@ contract RollProxy {
     using SafeCast for uint256;
     using YieldAuth for IController;
 
+    event Rolled(bytes32 indexed collateral, address indexed pool1, address pool2, address indexed user, uint256 daiDebtRepaid);
+
     IERC20 public immutable dai;
     IController public immutable controller;
     IProxyRegistry public immutable proxyRegistry;
@@ -214,7 +216,7 @@ contract RollProxy {
          
         _borrowToTarget(collateral, pool2, user, maxFYDaiCost);
 
-        // emit Event(); ?
+        emit Rolled(collateral, address(pool1), address(pool2), user, daiToBuy);
     }
 
     /// @dev Repay debt (denominated in Dai) either directly in Dai or in FYDai bought at a pool, depending on whether the fyDai has matured
