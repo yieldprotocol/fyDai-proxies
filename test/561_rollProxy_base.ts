@@ -109,7 +109,7 @@ contract('RollProxy', async (accounts) => {
     const maxFYDaiCost = new BN(toWad(100).toString())
     const daiDebtBefore = await controller.debtDai(WETH, maturity1, user1)
 
-    await rollProxy.rollDebtBeforeMaturity(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
+    await rollProxy.rollDebtEarly(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
       from: user1,
     })
     // Assert Dai debt of maturity 1 decreased by `debtToRoll`
@@ -125,7 +125,7 @@ contract('RollProxy', async (accounts) => {
   })
 
   it('rolls all debt before maturity', async () => {
-    await rollProxy.rollAllBeforeMaturity(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
+    await rollProxy.rollAllEarly(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
 
     assert.equal((await controller.debtDai(WETH, maturity1, user1)).toString(), '0')
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
@@ -145,7 +145,7 @@ contract('RollProxy', async (accounts) => {
 
     // Then borrow fyDai2Used to make the flash loan whole
 
-    await rollProxy.rollDebtAfterMaturity(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
+    await rollProxy.rollDebtMature(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
       from: user1,
     })
     // Assert Dai debt of maturity 1 decreased by `debtToRoll`
@@ -166,7 +166,7 @@ contract('RollProxy', async (accounts) => {
     await helper.advanceBlock()
     await fyDai1.mature()
 
-    await rollProxy.rollAllAfterMaturity(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
+    await rollProxy.rollAllMature(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
     assert.equal((await controller.debtDai(WETH, maturity1, user1)).toString(), '0')
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
@@ -193,7 +193,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollDebtBeforeMaturityWithSignature(
+    await rollProxy.rollDebtEarlyWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -223,7 +223,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollAllBeforeMaturityWithSignature(
+    await rollProxy.rollAllEarlyWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -254,7 +254,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollDebtAfterMaturityWithSignature(
+    await rollProxy.rollDebtMatureWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -284,7 +284,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollAllAfterMaturityWithSignature(
+    await rollProxy.rollAllMatureWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -299,22 +299,22 @@ contract('RollProxy', async (accounts) => {
     const debtToRoll = new BN(toWad(10).toString())
 
     await expectRevert(
-      rollProxy.rollDebtBeforeMaturity(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
+      rollProxy.rollDebtEarly(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
       'ERC20: transfer amount exceeds balance'
     )
 
     await expectRevert(
-      rollProxy.rollAllBeforeMaturity(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
+      rollProxy.rollAllEarly(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
       'ERC20: transfer amount exceeds balance'
     )
 
     await expectRevert(
-      rollProxy.rollDebtAfterMaturity(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
+      rollProxy.rollDebtMature(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
       'ERC20: transfer amount exceeds balance'
     )
 
     await expectRevert(
-      rollProxy.rollAllAfterMaturity(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
+      rollProxy.rollAllMature(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
       'ERC20: transfer amount exceeds balance'
     )
   })

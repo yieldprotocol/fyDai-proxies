@@ -96,7 +96,7 @@ contract RollProxy {
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
-    function rollDebtAfterMaturity(
+    function rollDebtMature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -128,7 +128,7 @@ contract RollProxy {
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
-    function rollDebtBeforeMaturity(
+    function rollDebtEarly(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -157,7 +157,7 @@ contract RollProxy {
     /// @param pool2 The pool trading the maturity in which the debt is being rolled to.
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
-    function rollAllAfterMaturity(
+    function rollAllMature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -185,7 +185,7 @@ contract RollProxy {
     /// @param pool2 The pool trading the maturity in which the debt is being rolled to.
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
-    function rollAllBeforeMaturity(
+    function rollAllEarly(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -231,9 +231,9 @@ contract RollProxy {
         ); // The msg.sender is the fyDai from one of the pools we know, and that we know only calls `executeOnFlashMint` in a strict loop. Therefore we can trust `data`.
 
         pool2.buyDai(address(this), address(this), daiToBuy.toUint128()); // If the loan (maxFYDaiCost) is not enough for this, is because of slippage. Built-in protection.
-        if (rollType == bytes32("RAAM") || rollType == bytes32("RDAM")) _repayAfterMaturity(collateral, pool1, user, daiToBuy); // We know the exact debt already for RAAM
-        else if (rollType == bytes32("RABM")) _repayAllBeforeMaturity(collateral, pool1, user);
-        else if (rollType == bytes32("RDBM")) _repayDebtBeforeMaturity(collateral, pool1, user, daiToBuy);
+        if (rollType == bytes32("RAAM") || rollType == bytes32("RDAM")) _repayMature(collateral, pool1, user, daiToBuy); // We know the exact debt already for RAAM
+        else if (rollType == bytes32("RABM")) _repayAllEarly(collateral, pool1, user);
+        else if (rollType == bytes32("RDBM")) _repayDebtEarly(collateral, pool1, user, daiToBuy);
          
         _borrowToTarget(collateral, pool2, user, maxFYDaiCost);
 
@@ -245,7 +245,7 @@ contract RollProxy {
     /// @param pool The pool trading the maturity in which the debt is denominated.
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param debtRepaid The amount of Dai debt that should be repaid, with holdings from this proxy.
-    function _repayAfterMaturity(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
+    function _repayMature(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
         uint256 maturity = pool.maturity();
 
         controller.repayDai(
@@ -262,7 +262,7 @@ contract RollProxy {
     /// @param pool The pool trading the maturity in which the debt is denominated.
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param debtRepaid The amount of Dai debt that should be repaid, with holdings from this proxy.
-    function _repayDebtBeforeMaturity(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
+    function _repayDebtEarly(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
         uint256 maturity = pool.maturity();
 
         uint256 fyDaiDebtToRepay = pool.sellDai(address(this), address(this), debtRepaid.toUint128());
@@ -279,10 +279,10 @@ contract RollProxy {
     /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
     /// @param pool The pool trading the maturity in which the debt is denominated.
     /// @param user The user owning the Yield Protocol v1 debt vault.
-    function _repayAllBeforeMaturity(bytes32 collateral, IPool pool, address user) private {
+    function _repayAllEarly(bytes32 collateral, IPool pool, address user) private {
         uint256 maturity = pool.maturity();
         
-        // In rollWholeBeforeMaturity we did a preview to make sure we would be buying enough Dai
+        // In rollWholeEarly we did a preview to make sure we would be buying enough Dai
         uint256 fyDaiDebtToRepay = controller.debtFYDai(collateral, maturity, user);
         pool.buyFYDai(address(this), address(this), fyDaiDebtToRepay.toUint128());
         controller.repayFYDai(
@@ -322,7 +322,7 @@ contract RollProxy {
     /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
-    function rollDebtAfterMaturityWithSignature(
+    function rollDebtMatureWithSignature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -332,7 +332,7 @@ contract RollProxy {
         bytes memory controllerSig
     ) external {
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
-        return rollDebtAfterMaturity(collateral, pool1, pool2, user, daiToBuy, maxFYDaiCost);
+        return rollDebtMature(collateral, pool1, pool2, user, daiToBuy, maxFYDaiCost);
     }
 
     /// @dev Roll debt from a non-mature series to another
@@ -342,7 +342,7 @@ contract RollProxy {
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param daiToBuy The amount of Dai to buy in pool2 to repay debt. Calculate off-chain using daiCostToRepay(collateral, pool1, daiDebtToRepay) or similar.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
-    function rollDebtBeforeMaturityWithSignature(
+    function rollDebtEarlyWithSignature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -352,7 +352,7 @@ contract RollProxy {
         bytes memory controllerSig
     ) external {
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
-        return rollDebtBeforeMaturity(collateral, pool1, pool2, user, daiToBuy, maxFYDaiCost);
+        return rollDebtEarly(collateral, pool1, pool2, user, daiToBuy, maxFYDaiCost);
     }
 
     /// @dev Roll all debt from one user and from one mature series to a non-mature series
@@ -362,7 +362,7 @@ contract RollProxy {
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
-    function rollAllAfterMaturityWithSignature(
+    function rollAllMatureWithSignature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -371,7 +371,7 @@ contract RollProxy {
         bytes memory controllerSig
     ) external {
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
-        return rollAllAfterMaturity(collateral, pool1, pool2, user, maxFYDaiCost);
+        return rollAllMature(collateral, pool1, pool2, user, maxFYDaiCost);
     }
 
     /// @dev Roll all debt from one user and from one non-mature series to another non-mature series
@@ -381,7 +381,7 @@ contract RollProxy {
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param maxFYDaiCost The maximum amount of fyDai debt that will be obtained to secure the new position. Calculate off-chain using pool2.buyDaiPreview(daiDebtToRepay.toUint128()), plus accepted slippage.
     /// @param controllerSig packed signature for delegation of this proxy in the controller. Ignored if '0x'.
-    function rollAllBeforeMaturityWithSignature(
+    function rollAllEarlyWithSignature(
         bytes32 collateral,
         IPool pool1,
         IPool pool2,
@@ -390,6 +390,6 @@ contract RollProxy {
         bytes memory controllerSig
     ) external {
         if (controllerSig.length > 0) controller.addDelegatePacked(controllerSig);
-        return rollAllBeforeMaturity(collateral, pool1, pool2, user, maxFYDaiCost);
+        return rollAllEarly(collateral, pool1, pool2, user, maxFYDaiCost);
     }
 }
