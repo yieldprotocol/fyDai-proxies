@@ -7,6 +7,7 @@ import "./IERC2612.sol";
 import "./IFYDai.sol";
 
 interface IPool is IDelegable, IERC20, IERC2612 {
+    function maturity() external view returns(uint256);
     function dai() external view returns(IERC20);
     function fyDai() external view returns(IFYDai);
     function getDaiReserves() external view returns(uint128);

@@ -20,7 +20,7 @@ contract Pool is IPool, Delegable(), ERC20Permit {
     int128 constant public k = int128(uint256((1 << 64)) / 126144000); // 1 / Seconds in 4 years, in 64.64
     int128 constant public g1 = int128(uint256((950 << 64)) / 1000); // To be used when selling Dai to the pool. All constants are `ufixed`, to divide them they must be converted to uint256
     int128 constant public g2 = int128(uint256((1000 << 64)) / 950); // To be used when selling fyDai to the pool. All constants are `ufixed`, to divide them they must be converted to uint256
-    uint128 immutable public maturity;
+    uint256 immutable public override maturity;
 
     IERC20 public override dai;
     IFYDai public override fyDai;
@@ -32,7 +32,7 @@ contract Pool is IPool, Delegable(), ERC20Permit {
         dai = IERC20(dai_);
         fyDai = IFYDai(fyDai_);
 
-        maturity = toUint128(fyDai.maturity());
+        maturity = fyDai.maturity();
     }
 
     /// @dev Trading can only be done before maturity

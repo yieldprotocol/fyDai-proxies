@@ -45,7 +45,7 @@ contract RollProxy {
     /// @param pool The pool trading the maturity in which the debt is denominated.
     /// @param daiDebt The amount of Dai debt to query the Dai repayment cost, also in Dai.
     function daiCostToRepay(bytes32 collateral, IPool pool, uint256 daiDebt) public view returns(uint256 daiCost) {
-        uint256 maturity = pool.fyDai().maturity();
+        uint256 maturity = pool.maturity();
 
         if (block.timestamp >= maturity){
             daiCost = daiDebt; // After maturity we pay using Dai, that the debt grows doesn't matter
@@ -111,29 +111,13 @@ contract RollProxy {
         // emit Event(); ?
     }
 
-    /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool).
-    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
-    /// @param pool The pool trading the maturity in which the debt is denominated.
-    /// @param user The user owning the Yield Protocol v1 debt vault.
-    /// @param targetFYDai The amount of fyDai that the proxy should hold after executing this function, at a minimum.
-    function _borrowToTarget(bytes32 collateral, IPool pool, address user, uint256 targetFYDai) private {
-        uint256 fyDaiBalance = pool.fyDai().balanceOf(address(this));
-        controller.borrow(
-            collateral,
-            pool.fyDai().maturity(),
-            user,
-            address(this),
-            targetFYDai > fyDaiBalance ? targetFYDai - fyDaiBalance : 0 // TODO: Can this be abused?
-        );
-    }
-
     /// @dev Repay debt (denominated in Dai) either directly in Dai or in FYDai bought at a pool, depending on whether the fyDai has matured
     /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
     /// @param pool The pool trading the maturity in which the debt is denominated.
     /// @param user The user owning the Yield Protocol v1 debt vault.
     /// @param debtRepaid The amount of Dai debt that should be repaid, with holdings from this proxy.
     function _bestRepay(bytes32 collateral, IPool pool, address user, uint256 debtRepaid) private {
-        uint256 maturity = pool.fyDai().maturity();
+        uint256 maturity = pool.maturity();
 
         if (block.timestamp >= maturity){
             controller.repayDai(
@@ -153,6 +137,22 @@ contract RollProxy {
                 fyDaiDebtToRepay
             );
         }
+    }
+
+    /// @dev Borrow so that this contract holds a target balance of a given fyDai (matching the one in the pool).
+    /// @param collateral A Yield Protocol v1 collateral type (WETH/CHAI)
+    /// @param pool The pool trading the maturity in which the debt is denominated.
+    /// @param user The user owning the Yield Protocol v1 debt vault.
+    /// @param targetFYDai The amount of fyDai that the proxy should hold after executing this function, at a minimum.
+    function _borrowToTarget(bytes32 collateral, IPool pool, address user, uint256 targetFYDai) private {
+        uint256 fyDaiBalance = pool.fyDai().balanceOf(address(this));
+        controller.borrow(
+            collateral,
+            pool.maturity(),
+            user,
+            address(this),
+            targetFYDai > fyDaiBalance ? targetFYDai - fyDaiBalance : 0 // TODO: Can this be abused?
+        );
     }
 
     /// --------------------------------------------------
