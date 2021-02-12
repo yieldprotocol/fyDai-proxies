@@ -43,9 +43,9 @@ contract('ImportProxy', async (accounts) => {
   let proxyRegistry: Contract
   let dsProxy: Contract
 
-  describe('disable timeout', async function() {
+  describe('disable timeout', async function () {
     this.timeout(0)
-    
+
     beforeEach(async () => {
       const block = await web3.eth.getBlockNumber()
       maturity1 = (await web3.eth.getBlock(block)).timestamp + 30000000 // Far enough so that the extra weth to borrow is above dust

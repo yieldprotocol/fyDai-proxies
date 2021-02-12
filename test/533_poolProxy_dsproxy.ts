@@ -50,7 +50,7 @@ contract('PoolProxy - DSProxy', async (accounts) => {
   let maturity0: number
   let maturity1: number
 
-  describe('disable timeout', async function() {
+  describe('disable timeout', async function () {
     this.timeout(0)
 
     beforeEach(async () => {
@@ -197,7 +197,6 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         )
         daiPoolSig = sign(daiPoolDigest, user2PrivateKey)
 
-
         // Authorize fyDAI for the pool0
         const fyDaiPoolDigest = getPermitDigest(
           await fyDai0.name(),
@@ -235,8 +234,8 @@ contract('PoolProxy - DSProxy', async (accounts) => {
         await dai.mint(user2, oneToken.mul(100), { from: owner })
 
         const calldata = poolProxy.contract.methods
-        .buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig)
-        .encodeABI()
+          .buyAddLiquidityWithSignature(pool0.address, oneToken, MAX, daiPoolSig, fyDaiPoolSig, poolSig)
+          .encodeABI()
         await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
           from: user2,
         })
@@ -297,7 +296,13 @@ contract('PoolProxy - DSProxy', async (accounts) => {
           const poolTokens = (await pool0.balanceOf(user2)).toString()
 
           const calldata = poolProxy.contract.methods
-            .removeLiquidityEarlyDaiFixedWithSignature(pool0.address, poolTokens.toString(), '0', controllerSig, poolSig)
+            .removeLiquidityEarlyDaiFixedWithSignature(
+              pool0.address,
+              poolTokens.toString(),
+              '0',
+              controllerSig,
+              poolSig
+            )
             .encodeABI()
           await dsProxy.methods['execute(address,bytes)'](poolProxy.address, calldata, {
             from: user2,

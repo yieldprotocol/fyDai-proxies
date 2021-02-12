@@ -37,7 +37,7 @@ module.exports = async (deployer, network, accounts) => {
   const controller = await Controller.deployed()
   controllerAddress = controller.address
   const treasuryFunctions = ['pushDai', 'pullDai', 'pushChai', 'pullChai', 'pushWeth', 'pullWeth'].map((func) =>
-    id(func + '(address,uint256)')
+    id(func + '(address,uint256)').slice(0,10)
   )
   await treasury.batchOrchestrate(controllerAddress, treasuryFunctions)
 
@@ -45,26 +45,26 @@ module.exports = async (deployer, network, accounts) => {
   await deployer.deploy(Liquidations, controllerAddress)
   const liquidations = await Liquidations.deployed()
   liquidationsAddress = liquidations.address
-  await controller.orchestrate(liquidationsAddress, id('erase(bytes32,address)'))
+  await controller.orchestrate(liquidationsAddress, id('erase(bytes32,address)').slice(0,10))
   await treasury.batchOrchestrate(liquidationsAddress, [
-      id('pushDai(address,uint256)'),
-      id('pullWeth(address,uint256)'),
+      id('pushDai(address,uint256)').slice(0,10),
+      id('pullWeth(address,uint256)').slice(0,10),
   ])
 
   // Setup Unwind
   await deployer.deploy(Unwind, endAddress, liquidationsAddress)
   const unwind = await Unwind.deployed()
   unwindAddress = unwind.address
-  await controller.orchestrate(unwind.address, id('erase(bytes32,address)'))
-  await liquidations.orchestrate(unwind.address, id('erase(address)'))
+  await controller.orchestrate(unwind.address, id('erase(bytes32,address)').slice(0,10))
+  await liquidations.orchestrate(unwind.address, id('erase(address)').slice(0,10))
 
   // FYDai orchestration
   for (const addr of fyDais) {
     const fyDai = await FYDai.at(addr)
-    await treasury.orchestrate(addr, id('pullDai(address,uint256)'))
+    await treasury.orchestrate(addr, id('pullDai(address,uint256)').slice(0,10))
 
-    await fyDai.batchOrchestrate(controller.address, [id('mint(address,uint256)'), id('burn(address,uint256)')])
-    await fyDai.orchestrate(unwind.address, id('burn(address,uint256)'))
+    await fyDai.batchOrchestrate(controller.address, [id('mint(address,uint256)').slice(0,10), id('burn(address,uint256)').slice(0,10)])
+    await fyDai.orchestrate(unwind.address, id('burn(address,uint256)').slice(0,10))
   }
 
   // Register Unwind at the very end. If the script fails after this point, Treasury needs to be redeployed.

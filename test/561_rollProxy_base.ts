@@ -79,8 +79,8 @@ contract('RollProxy', async (accounts) => {
     fyDai2 = protocol.fyDais[1]
     pool1 = yieldSpace.pools[0]
     pool2 = yieldSpace.pools[1]
-    await yieldSpace.initPool(pool1, toWad(1000), owner)
-    await yieldSpace.initPool(pool2, toWad(1000), owner)
+    await yieldSpace.initPool(pool1, toWad(2000), owner)
+    await yieldSpace.initPool(pool2, toWad(2000), owner)
 
     // Setup DSProxyFactory and DSProxyCache
     proxyFactory = await DSProxyFactory.new({ from: owner })
@@ -89,7 +89,9 @@ contract('RollProxy', async (accounts) => {
     proxyRegistry = await DSProxyRegistry.new(proxyFactory.address, { from: owner })
 
     // Setup RollProxy
-    rollProxy = await RollProxy.new(controller.address, [pool1.address, pool2.address], proxyRegistry.address, { from: owner })
+    rollProxy = await RollProxy.new(controller.address, [pool1.address, pool2.address], proxyRegistry.address, {
+      from: owner,
+    })
 
     await protocol.postWeth(user1, toWad(10))
     await controller.borrow(WETH, maturity1, user1, user1, toWad(100), { from: user1 })
@@ -101,105 +103,81 @@ contract('RollProxy', async (accounts) => {
     await helper.revertToSnapshot(snapshotId)
   })
 
-  it('rolls debt before maturity', async () => {
+  it('rolls some debt before maturity', async () => {
     const debtToRoll = new BN(toWad(10).toString())
     const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
     const maxFYDaiCost = new BN(toWad(100).toString())
     const daiDebtBefore = await controller.debtDai(WETH, maturity1, user1)
 
-    /*
-    const daiToPay = buyFYDai(
-      (await pool1.getDaiReserves()).toString(),
-      (await pool1.getFYDaiReserves()).toString(),
-      (await controller.inFYDai(WETH, maturity1, debtToRoll)).toString(), // Convert `debtToRoll` to fyDai1, and then buy it
-      (new BN(maturity1)).sub(await currentTimestamp()).toString(),
-    )
-    const debtInFYDai2 = await controller.inFYDai(WETH, maturity2, floor(daiToPay).toFixed().toString()) // We borrow `daiToPay` worth of fyDai2
-    */
-
-    // Then borrow fyDai2Used to make the flash loan whole
-
-    await rollProxy.rollDebt(
-      WETH,
-      pool1.address,
-      pool2.address,
-      user1,
-      daiToBuy,
-      maxFYDaiCost,
-      { from: user1 }
-    )
+    await rollProxy.rollDebtEarly(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
+      from: user1,
+    })
     // Assert Dai debt of maturity 1 decreased by `debtToRoll`
     almostEqual(
       await controller.debtDai(WETH, maturity1, user1),
       daiDebtBefore.sub(debtToRoll),
       debtToRoll.divn(100000)
     )
-    // Calculate how much fyDai2 debt is that equivalent to.
-    /* almostEqual(
-      await controller.debtFYDai(WETH, maturity2, user1),
-      debtInFYDai2.toString(),
-      debtToRoll.divn(100000)
-    ) */
-    // At least, make sure the proxy keeps nothing
+    // Make sure the proxy keeps nothing
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
   })
 
-  it('rolls debt after maturity', async () => {
+  it('rolls all debt before maturity', async () => {
+    await rollProxy.rollAllEarly(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
+
+    assert.equal((await controller.debtDai(WETH, maturity1, user1)).toString(), '0')
+    assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
+    assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
+    assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
+  })
+
+  it('rolls some debt after maturity', async () => {
     await helper.advanceTime(31556952)
     await helper.advanceBlock()
     await fyDai1.mature()
 
     const debtToRoll = new BN(toWad(10).toString())
     const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
-    const maxFYDaiCost = new BN(toWad(100).toString())    
+    const maxFYDaiCost = new BN(toWad(100).toString())
     const daiDebtBefore = await controller.debtDai(WETH, maturity1, user1)
-
-    /*
-    const daiToPay = buyFYDai(
-      (await pool1.getDaiReserves()).toString(),
-      (await pool1.getFYDaiReserves()).toString(),
-      (await controller.inFYDai(WETH, maturity1, debtToRoll)).toString(), // Convert `debtToRoll` to fyDai1, and then buy it
-      (new BN(maturity1)).sub(await currentTimestamp()).toString(),
-    )
-    const debtInFYDai2 = await controller.inFYDai(WETH, maturity2, floor(daiToPay).toFixed().toString()) // We borrow `daiToPay` worth of fyDai2
-    */
 
     // Then borrow fyDai2Used to make the flash loan whole
 
-    await rollProxy.rollDebt(
-      WETH,
-      pool1.address,
-      pool2.address,
-      user1,
-      daiToBuy,
-      maxFYDaiCost,
-      { from: user1 }
-    )
+    await rollProxy.rollDebtMature(WETH, pool1.address, pool2.address, user1, daiToBuy, maxFYDaiCost, {
+      from: user1,
+    })
     // Assert Dai debt of maturity 1 decreased by `debtToRoll`
     almostEqual(
       await controller.debtDai(WETH, maturity1, user1),
       daiDebtBefore.sub(debtToRoll),
       debtToRoll.divn(100000)
     )
-    // Calculate how much fyDai2 debt is that equivalent to.
-    /* almostEqual(
-      await controller.debtFYDai(WETH, maturity2, user1),
-      debtInFYDai2.toString(),
-      debtToRoll.divn(100000)
-    ) */
-    // At least, make sure the proxy keeps nothing
+
+    // Make sure the proxy keeps nothing
     assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
     assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
   })
 
-  it('rolls debt with signature', async () => {
+  it('rolls all debt after maturity', async () => {
+    await helper.advanceTime(31556952)
+    await helper.advanceBlock()
+    await fyDai1.mature()
+
+    await rollProxy.rollAllMature(WETH, pool1.address, pool2.address, user1, toWad(2000), { from: user1 })
+    assert.equal((await controller.debtDai(WETH, maturity1, user1)).toString(), '0')
+    assert.equal((await dai.balanceOf(rollProxy.address)).toString(), '0')
+    assert.equal((await fyDai1.balanceOf(rollProxy.address)).toString(), '0')
+    assert.equal((await fyDai2.balanceOf(rollProxy.address)).toString(), '0')
+  })
+
+  it('rolls some debt before maturity with signature', async () => {
     await controller.revokeDelegate(rollProxy.address, { from: user1 })
     const debtToRoll = new BN(toWad(10).toString())
     const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
-    const maxFYDaiCost = new BN(toWad(100).toString())    
+    const maxFYDaiCost = new BN(toWad(100).toString())
 
     // Authorize the proxy for the controller
     const controllerDigest = getSignatureDigest(
@@ -215,7 +193,7 @@ contract('RollProxy', async (accounts) => {
     )
     const controllerSig = sign(controllerDigest, userPrivateKey)
 
-    await rollProxy.rollDebtWithSignature(
+    await rollProxy.rollDebtEarlyWithSignature(
       WETH,
       pool1.address,
       pool2.address,
@@ -227,20 +205,117 @@ contract('RollProxy', async (accounts) => {
     )
   })
 
+  it('rolls all debt before maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const maxFYDaiCost = new BN(toWad(2000).toString())
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollAllEarlyWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
+  it('rolls some debt after maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const debtToRoll = new BN(toWad(10).toString())
+    const daiToBuy = await rollProxy.daiCostToRepay(WETH, pool1.address, debtToRoll)
+    const maxFYDaiCost = new BN(toWad(100).toString())
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollDebtMatureWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      daiToBuy,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
+  it('rolls all debt after maturity with signature', async () => {
+    await controller.revokeDelegate(rollProxy.address, { from: user1 })
+    const maxFYDaiCost = new BN(toWad(2000).toString())
+
+    // Authorize the proxy for the controller
+    const controllerDigest = getSignatureDigest(
+      name,
+      controller.address,
+      chainId,
+      {
+        user: user1,
+        delegate: rollProxy.address,
+      },
+      (await controller.signatureCount(user1)).toString(),
+      MAX
+    )
+    const controllerSig = sign(controllerDigest, userPrivateKey)
+
+    await rollProxy.rollAllMatureWithSignature(
+      WETH,
+      pool1.address,
+      pool2.address,
+      user1,
+      maxFYDaiCost,
+      controllerSig,
+      { from: user1 }
+    )
+  })
+
   it('Reverts if the cost in fyDai2 is too large', async () => {
     const debtToRoll = new BN(toWad(10).toString())
 
     await expectRevert(
-      rollProxy.rollDebt(
-        WETH,
-        pool1.address,
-        pool2.address,
-        user1,
-        debtToRoll,
-        0,
-        { from: user1 }
-      ),
-      "ERC20: transfer amount exceeds balance"
+      rollProxy.rollDebtEarly(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
+      'ERC20: transfer amount exceeds balance'
+    )
+
+    await expectRevert(
+      rollProxy.rollAllEarly(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
+      'ERC20: transfer amount exceeds balance'
+    )
+
+    await expectRevert(
+      rollProxy.rollDebtMature(WETH, pool1.address, pool2.address, user1, debtToRoll, 0, { from: user1 }),
+      'ERC20: transfer amount exceeds balance'
+    )
+
+    await expectRevert(
+      rollProxy.rollAllMature(WETH, pool1.address, pool2.address, user1, 0, { from: user1 }),
+      'ERC20: transfer amount exceeds balance'
     )
   })
 })

@@ -47,7 +47,7 @@ contract('ImportCdpProxy', async (accounts) => {
   let cdp: any
   let urn: any
 
-  describe('disable timeout', async function() {
+  describe('disable timeout', async function () {
     this.timeout(0)
 
     beforeEach(async () => {
@@ -238,7 +238,9 @@ contract('ImportCdpProxy', async (accounts) => {
       // Give CDP to static ImportCdpProxy
       await cdpMgr.give(cdp, importCdpProxy.address, { from: user })
 
-      await importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, daiDebt, toRay(2), { from: user })
+      await importCdpProxy.importCdpFromProxy(pool1.address, user, cdp, wethCollateral, daiDebt, toRay(2), {
+        from: user,
+      })
 
       assert.equal(await fyDai1.balanceOf(importCdpProxy.address), 0)
       assert.equal(await dai.balanceOf(importCdpProxy.address), 0)

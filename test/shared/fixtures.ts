@@ -45,10 +45,7 @@ export class YieldSpace {
   fyDais: Array<Contract>
   pools: Array<Contract>
 
-  constructor(
-    protocol: YieldEnvironmentLite,
-    pools: Array<Contract>
-  ) {
+  constructor(protocol: YieldEnvironmentLite, pools: Array<Contract>) {
     this.protocol = protocol
     this.dai = protocol.maker.dai
     this.fyDais = protocol.fyDais
@@ -83,7 +80,6 @@ export class YieldSpace {
     await pool.sellFYDai(owner, owner, initialFYDai, { from: owner })
   }
 }
-
 
 export class MakerEnvironment {
   vat: Contract
