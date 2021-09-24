@@ -59,6 +59,13 @@ contract('RollProxy', async (accounts) => {
 
   let maturity1: number
   let maturity2: number
+  let maturity3: number
+  let maturity4: number
+  let maturity5: number
+  let maturity6: number
+  let maturity7: number
+  let maturity8: number
+  let maturity9: number
 
   beforeEach(async () => {
     snapshot = await helper.takeSnapshot()
@@ -66,7 +73,24 @@ contract('RollProxy', async (accounts) => {
 
     maturity1 = (await currentTimestamp()).addn(31556952) // One year
     maturity2 = (await currentTimestamp()).addn(63113904) // Two years
-    protocol = await YieldEnvironmentLite.setup([maturity1, maturity2])
+    maturity3 = (await currentTimestamp()).addn(63113905) // Two years
+    maturity4 = (await currentTimestamp()).addn(63113906) // Two years
+    maturity5 = (await currentTimestamp()).addn(63113907) // Two years
+    maturity6 = (await currentTimestamp()).addn(63113908) // Two years
+    maturity7 = (await currentTimestamp()).addn(63113909) // Two years
+    maturity8 = (await currentTimestamp()).addn(63113910) // Two years
+    maturity9 = (await currentTimestamp()).addn(63113911) // Two years
+    protocol = await YieldEnvironmentLite.setup([
+      maturity1,
+      maturity2,
+      maturity3,
+      maturity4,
+      maturity5,
+      maturity6,
+      maturity7,
+      maturity8,
+      maturity9,
+    ])
     yieldSpace = await YieldSpace.setup(protocol)
 
     maker = protocol.maker
@@ -95,6 +119,10 @@ contract('RollProxy', async (accounts) => {
 
     await protocol.postWeth(user1, toWad(10))
     await controller.borrow(WETH, maturity1, user1, user1, toWad(100), { from: user1 })
+    await controller.borrow(WETH, maturity2, user1, user1, toWad(1), { from: user1 })
+    await controller.borrow(WETH, maturity3, user1, user1, toWad(1), { from: user1 })
+    await controller.borrow(WETH, maturity4, user1, user1, toWad(1), { from: user1 })
+    await controller.borrow(WETH, maturity5, user1, user1, toWad(1), { from: user1 })
 
     await controller.addDelegate(rollProxy.address, { from: user1 })
   })
