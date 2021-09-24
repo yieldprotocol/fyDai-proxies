@@ -23,7 +23,7 @@ contract MigrateLiquidityProxy is DecimalMath {
     /// @param poolTokens amount of pool tokens to burn. 
     /// @param minimumFYDaiPrice minimum Dai/fyDai price to be accepted when internally selling fyDai.
     /// @param poolSig packed signature for delegation of this proxy in a pool. Ignored if '0x'.
-    function removeLiquidityEarly(IPool pool, IStrategy strategy, uint256 poolTokens, uint256 minimumFYDaiPrice, bytes memory poolSig) public {
+    function migrateLiquidity(IPool pool, IStrategy strategy, uint256 poolTokens, uint256 minimumFYDaiPrice, bytes memory poolSig) public {
         if (poolSig.length > 0) pool.addDelegatePacked(poolSig);
 
         IERC20 dai = pool.dai();
