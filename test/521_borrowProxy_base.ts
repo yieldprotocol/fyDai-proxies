@@ -8,6 +8,11 @@ import { MakerEnvironment, YieldEnvironmentLite, Contract } from './shared/fixtu
 import { balance, BN, expectRevert } from '@openzeppelin/test-helpers'
 import { assert, expect } from 'chai'
 
+async function currentTimestamp(): BN {
+  const block = await web3.eth.getBlockNumber()
+  return new BN((await web3.eth.getBlock(block)).timestamp.toString())
+}
+
 contract('BorrowProxy', async (accounts) => {
   let [owner, user1, user2] = accounts
 
@@ -30,11 +35,36 @@ contract('BorrowProxy', async (accounts) => {
   const oneToken = toWad(1)
 
   let maturity1: number
+  let maturity2: number
+  let maturity3: number
+  let maturity4: number
+  let maturity5: number
+  let maturity6: number
+  let maturity7: number
+  let maturity8: number
+  let maturity9: number
 
   beforeEach(async () => {
-    const block = await web3.eth.getBlockNumber()
-    maturity1 = (await web3.eth.getBlock(block)).timestamp + 31556952 // One year
-    env = await YieldEnvironmentLite.setup([maturity1])
+    maturity1 = (await currentTimestamp()).addn(31556952) // One year
+    maturity2 = (await currentTimestamp()).addn(63113904) // Two years
+    maturity3 = (await currentTimestamp()).addn(63113905) // Two years
+    maturity4 = (await currentTimestamp()).addn(63113906) // Two years
+    maturity5 = (await currentTimestamp()).addn(63113907) // Two years
+    maturity6 = (await currentTimestamp()).addn(63113908) // Two years
+    maturity7 = (await currentTimestamp()).addn(63113909) // Two years
+    maturity8 = (await currentTimestamp()).addn(63113910) // Two years
+    maturity9 = (await currentTimestamp()).addn(63113911) // Two years
+    env = await YieldEnvironmentLite.setup([
+      maturity1,
+      maturity2,
+      maturity3,
+      maturity4,
+      maturity5,
+      maturity6,
+      maturity7,
+      maturity8,
+      maturity9,
+    ])
     maker = env.maker
     weth = maker.weth
     dai = maker.dai
@@ -206,6 +236,10 @@ contract('BorrowProxy', async (accounts) => {
               from: user1,
             }
           )
+          await controller.borrow(WETH, maturity2, user1, user1, toWad(1), { from: user1 })
+          await controller.borrow(WETH, maturity3, user1, user1, toWad(1), { from: user1 })
+          await controller.borrow(WETH, maturity4, user1, user1, toWad(1), { from: user1 })
+          await controller.borrow(WETH, maturity5, user1, user1, toWad(1), { from: user1 })
         })
 
         it('approvals only need to be set up once', async () => {
